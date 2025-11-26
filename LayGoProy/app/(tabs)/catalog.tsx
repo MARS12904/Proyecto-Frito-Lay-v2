@@ -66,11 +66,7 @@ function CatalogContent() {
         Alert.alert('Stock insuficiente', 'No hay stock suficiente para agregar este producto.');
         return;
       }
-      const reduced = await reduceStock(product.id, desiredQty);
-      if (!reduced) {
-        Alert.alert('Stock insuficiente', 'No se pudo reservar stock.');
-        return;
-      }
+      // Ya no reducimos el stock aquí, solo se reduce al procesar el pago
       addToCart(product, desiredQty);
       Alert.alert('Éxito', `${product.name} agregado al carrito`);
     }
@@ -82,11 +78,7 @@ function CatalogContent() {
         Alert.alert('Stock insuficiente', 'No hay stock suficiente para la cantidad seleccionada.');
         return;
       }
-      const reduced = await reduceStock(selectedProduct.id, quantity);
-      if (!reduced) {
-        Alert.alert('Stock insuficiente', 'No se pudo reservar stock.');
-        return;
-      }
+      // Ya no reducimos el stock aquí, solo se reduce al procesar el pago
       addToCart(selectedProduct, quantity);
       Alert.alert('Éxito', `${selectedProduct.name} agregado al carrito (${quantity} unidades)`);
       setShowQuantityModal(false);

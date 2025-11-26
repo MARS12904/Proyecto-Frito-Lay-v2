@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Product } from '../data/products';
 import { useStock } from './StockContext';
+import { cartService } from '../services/cartService';
+import { useAuth } from './AuthContext';
 
 interface CartItem {
   product: Product;
@@ -66,6 +68,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isWholesaleMode, setIsWholesaleMode] = useState(true); // Por defecto modo mayorista
   const [deliverySchedule, setDeliveryScheduleState] = useState<DeliverySchedule | undefined>();
   const { isProductAvailable, reduceStock, increaseStock } = useStock();
+  const { user } = useAuth();
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = items.reduce((sum, item) => sum + item.subtotal, 0);
@@ -76,24 +79,49 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadCart();
   }, []);
 
+  // Recargar carrito cuando cambie el usuario
+  useEffect(() => {
+    if (user?.id) {
+      loadCart();
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     saveCart();
   }, [items, isWholesaleMode, deliverySchedule]);
 
   const loadCart = async () => {
     try {
-      const cartData = await AsyncStorage.getItem('cart');
-      const wholesaleData = await AsyncStorage.getItem('wholesaleMode');
-      const deliveryData = await AsyncStorage.getItem('deliverySchedule');
+      const userId = user?.id;
       
-      if (cartData) {
-        setItems(JSON.parse(cartData));
-      }
-      if (wholesaleData) {
-        setIsWholesaleMode(JSON.parse(wholesaleData));
-      }
-      if (deliveryData) {
-        setDeliveryScheduleState(JSON.parse(deliveryData));
+      // Si el usuario tiene UUID válido (está en Supabase), cargar desde Supabase
+      if (userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+        const savedCart = await cartService.getCart(userId);
+        if (savedCart) {
+          setItems(savedCart.items || []);
+          setIsWholesaleMode(savedCart.is_wholesale_mode ?? true);
+          if (savedCart.delivery_schedule) {
+            setDeliveryScheduleState(savedCart.delivery_schedule);
+          }
+        }
+      } else {
+        // Fallback a AsyncStorage para usuarios locales
+        const currentUserId = await AsyncStorage.getItem('currentUserId');
+        const userId = currentUserId || 'guest';
+        
+        const cartData = await AsyncStorage.getItem(`cart_${userId}`);
+        const wholesaleData = await AsyncStorage.getItem(`wholesaleMode_${userId}`);
+        const deliveryData = await AsyncStorage.getItem(`deliverySchedule_${userId}`);
+        
+        if (cartData) {
+          setItems(JSON.parse(cartData));
+        }
+        if (wholesaleData) {
+          setIsWholesaleMode(JSON.parse(wholesaleData));
+        }
+        if (deliveryData) {
+          setDeliveryScheduleState(JSON.parse(deliveryData));
+        }
       }
     } catch (error) {
       console.error('Error loading cart:', error);
@@ -102,10 +130,26 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const saveCart = async () => {
     try {
-      await AsyncStorage.setItem('cart', JSON.stringify(items));
-      await AsyncStorage.setItem('wholesaleMode', JSON.stringify(isWholesaleMode));
-      if (deliverySchedule) {
-        await AsyncStorage.setItem('deliverySchedule', JSON.stringify(deliverySchedule));
+      const userId = user?.id;
+      
+      // Si el usuario tiene UUID válido (está en Supabase), guardar en Supabase
+      if (userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+        await cartService.saveCart({
+          user_id: userId,
+          items: items,
+          is_wholesale_mode: isWholesaleMode,
+          delivery_schedule: deliverySchedule,
+        });
+      } else {
+        // Fallback a AsyncStorage para usuarios locales
+        const currentUserId = await AsyncStorage.getItem('currentUserId');
+        const userId = currentUserId || 'guest';
+        
+        await AsyncStorage.setItem(`cart_${userId}`, JSON.stringify(items));
+        await AsyncStorage.setItem(`wholesaleMode_${userId}`, JSON.stringify(isWholesaleMode));
+        if (deliverySchedule) {
+          await AsyncStorage.setItem(`deliverySchedule_${userId}`, JSON.stringify(deliverySchedule));
+        }
       }
     } catch (error) {
       console.error('Error saving cart:', error);
@@ -123,19 +167,24 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       quantity = product.maxOrderQuantity;
     }
 
+    // Validar que haya stock disponible (sin reducirlo aún)
+    if (!isProductAvailable(product.id, quantity)) {
+      return; // no agregar si no hay stock
+    }
+
     const existingItem = items.find(item => item.product.id === product.id);
     const unitPrice = isWholesaleMode ? product.wholesalePrice : product.price;
 
     if (existingItem) {
       const newQuantity = existingItem.quantity + quantity;
       const finalQuantity = Math.min(newQuantity, product.maxOrderQuantity);
-      const delta = finalQuantity - existingItem.quantity;
-      if (delta > 0) {
-        if (!isProductAvailable(product.id, delta)) {
-          return; // sin cambios si no hay stock
-        }
-        await reduceStock(product.id, delta);
+      
+      // Validar stock total disponible
+      const totalNeeded = finalQuantity;
+      if (!isProductAvailable(product.id, totalNeeded)) {
+        return; // sin cambios si no hay stock suficiente
       }
+      
       setItems(prevItems => prevItems.map(item =>
         item.product.id === product.id
           ? {
@@ -147,10 +196,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           : item
       ));
     } else {
-      if (!isProductAvailable(product.id, quantity)) {
-        return; // no agregar si no hay stock
-      }
-      await reduceStock(product.id, quantity);
       setItems(prevItems => [...prevItems, {
         product,
         quantity,
@@ -161,10 +206,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const removeFromCart = async (productId: string) => {
-    const item = items.find(i => i.product.id === productId);
-    if (item) {
-      await increaseStock(productId, item.quantity);
-    }
+    // No necesitamos aumentar el stock porque nunca lo redujimos
     setItems(prevItems => prevItems.filter(item => item.product.id !== productId));
   };
 
@@ -177,15 +219,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const item = items.find(i => i.product.id === productId);
     if (!item) return;
     const clamped = Math.min(quantity, item.product.maxOrderQuantity);
-    const delta = clamped - item.quantity;
-    if (delta > 0) {
-      if (!isProductAvailable(productId, delta)) {
-        return; // sin cambios
-      }
-      await reduceStock(productId, delta);
-    } else if (delta < 0) {
-      await increaseStock(productId, Math.abs(delta));
+    
+    // Validar que haya stock disponible (sin reducirlo aún)
+    if (!isProductAvailable(productId, clamped)) {
+      return; // sin cambios si no hay stock suficiente
     }
+    
     const unitPrice = isWholesaleMode ? item.product.wholesalePrice : item.product.price;
     setItems(prevItems => prevItems.map(it => it.product.id === productId ? {
       ...it,
@@ -195,8 +234,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } : it));
   };
 
-  const clearCart = () => {
+  const clearCart = async () => {
     setItems([]);
+    // Limpiar también la programación de entrega al vaciar el carrito
+    setDeliveryScheduleState(undefined);
+    try {
+      const currentUserId = await AsyncStorage.getItem('currentUserId');
+      const userId = currentUserId || 'guest';
+      await AsyncStorage.removeItem(`deliverySchedule_${userId}`);
+    } catch (error) {
+      console.error('Error clearing delivery schedule:', error);
+    }
   };
 
   const isInCart = (productId: string) => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,8 @@ import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '../../constan
 import * as WebBrowser from 'expo-web-browser';
 import { PAYMENT_LINK_URL } from '../../constants/payments';
 import { router } from 'expo-router';
+import { paymentMethodsService } from '../../services/paymentMethodsService';
+import { PaymentMethod as SavedPaymentMethod } from '../../data/userStorage';
 
 interface PaymentMethod {
   id: string;
@@ -92,6 +94,9 @@ function PaymentsContent() {
   const { reduceStock } = useStock();
   const { updateMetrics } = useMetrics();
   const [selectedMethod, setSelectedMethod] = useState<string>('');
+  const [savedPaymentMethods, setSavedPaymentMethods] = useState<SavedPaymentMethod[]>([]);
+  const [selectedSavedMethod, setSelectedSavedMethod] = useState<string | null>(null);
+  const [useDifferentMethod, setUseDifferentMethod] = useState(false);
   const [cardDetails, setCardDetails] = useState({
     number: '',
     expiry: '',
@@ -106,6 +111,91 @@ function PaymentsContent() {
 
   const cartSummary = getCartSummary();
   const orderValidation = validateOrder();
+
+  // Función para seleccionar un método guardado
+  const handleSelectSavedMethod = (methodId: string) => {
+    setSelectedSavedMethod(methodId);
+    setUseDifferentMethod(false);
+    setSelectedMethod(''); // Limpiar selección de método genérico
+    
+    const savedMethod = savedPaymentMethods.find(m => m.id === methodId);
+    if (savedMethod) {
+      // Pre-llenar datos según el tipo
+      if (savedMethod.type === 'card' && savedMethod.details) {
+        setSelectedMethod('card');
+        setCardDetails({
+          number: savedMethod.details.cardNumber || '',
+          expiry: savedMethod.details.expiryDate || '',
+          cvv: '', // No guardamos CVV por seguridad
+          name: savedMethod.name,
+        });
+      } else if (savedMethod.type === 'transfer' && savedMethod.details) {
+        setSelectedMethod('transfer');
+        setBankDetails({
+          bank: savedMethod.details.bank || '',
+          account: savedMethod.details.accountNumber || '',
+          reference: '', // La referencia se ingresa en cada compra
+        });
+      } else {
+        // Para cash o credit, solo seleccionar el tipo
+        setSelectedMethod(savedMethod.type);
+      }
+    }
+  };
+
+  // Función para usar un método diferente
+  const handleUseDifferentMethod = () => {
+    setUseDifferentMethod(true);
+    setSelectedSavedMethod(null);
+    setSelectedMethod('');
+    setCardDetails({ number: '', expiry: '', cvv: '', name: '' });
+    setBankDetails({ bank: '', account: '', reference: '' });
+  };
+
+  // Cargar métodos de pago guardados
+  useEffect(() => {
+    const loadSavedPaymentMethods = async () => {
+      if (!user?.id) return;
+
+      try {
+        const methods = await paymentMethodsService.getPaymentMethods(user.id);
+        setSavedPaymentMethods(methods);
+        
+        // Si hay un método por defecto, seleccionarlo automáticamente
+        const defaultMethod = methods.find(m => m.isDefault);
+        if (defaultMethod) {
+          // Seleccionar directamente sin usar la función para evitar dependencias
+          setSelectedSavedMethod(defaultMethod.id);
+          setUseDifferentMethod(false);
+          setSelectedMethod('');
+          
+          // Pre-llenar datos según el tipo
+          if (defaultMethod.type === 'card' && defaultMethod.details) {
+            setSelectedMethod('card');
+            setCardDetails({
+              number: defaultMethod.details.cardNumber || '',
+              expiry: defaultMethod.details.expiryDate || '',
+              cvv: '',
+              name: defaultMethod.name,
+            });
+          } else if (defaultMethod.type === 'transfer' && defaultMethod.details) {
+            setSelectedMethod('transfer');
+            setBankDetails({
+              bank: defaultMethod.details.bank || '',
+              account: defaultMethod.details.accountNumber || '',
+              reference: '',
+            });
+          } else {
+            setSelectedMethod(defaultMethod.type);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading saved payment methods:', error);
+      }
+    };
+
+    loadSavedPaymentMethods();
+  }, [user?.id]);
 
   const openPaymentLink = async () => {
     try {
@@ -122,7 +212,17 @@ function PaymentsContent() {
     }
 
     try {
-      // 1. Verificar stock disponible
+      // Determinar el nombre del método de pago
+      let paymentMethodName = 'Desconocido';
+      if (selectedSavedMethod && !useDifferentMethod) {
+        const savedMethod = savedPaymentMethods.find(m => m.id === selectedSavedMethod);
+        paymentMethodName = savedMethod?.name || 'Método guardado';
+      } else {
+        const currentMethod = paymentMethods.find(m => m.id === selectedMethod);
+        paymentMethodName = currentMethod?.name || 'Desconocido';
+      }
+
+      // 1. Verificar y reducir stock disponible (ahora sí se reduce al procesar el pago)
       for (const item of items) {
         const stockAvailable = await reduceStock(item.product.id, item.quantity);
         if (!stockAvailable) {
@@ -154,7 +254,7 @@ function PaymentsContent() {
         deliveryDate: deliverySchedule?.date,
         deliveryAddress: deliverySchedule?.address,
         deliveryTimeSlot: deliverySchedule?.timeSlot,
-        paymentMethod: paymentMethods.find(m => m.id === selectedMethod)?.name || 'Desconocido',
+        paymentMethod: paymentMethodName,
         isWholesale: isWholesaleMode,
         userId: user.id,
       });
@@ -166,8 +266,9 @@ function PaymentsContent() {
         items: orderItems,
       });
 
-      // 4. Limpiar carrito
+      // 4. Limpiar carrito y programación de entrega
       clearCart();
+      // Nota: clearCart ya limpia el deliverySchedule, pero lo hacemos explícito
 
       // 5. Mostrar confirmación
       Alert.alert(
@@ -198,37 +299,73 @@ function PaymentsContent() {
       return;
     }
 
-    if (!selectedMethod) {
-      Alert.alert('Error', 'Selecciona un método de pago');
-      return;
-    }
-
-    const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedMethod);
-    if (!selectedPaymentMethod?.available) {
-      Alert.alert('Error', 'Método de pago no disponible');
-      return;
-    }
-
-    if (selectedMethod === 'card') {
-      if (!cardDetails.number || !cardDetails.expiry || !cardDetails.cvv || !cardDetails.name) {
-        Alert.alert('Error', 'Completa todos los datos de la tarjeta');
+    // Si se seleccionó un método guardado, validar que esté completo
+    if (selectedSavedMethod && !useDifferentMethod) {
+      const savedMethod = savedPaymentMethods.find(m => m.id === selectedSavedMethod);
+      if (savedMethod) {
+        if (savedMethod.type === 'card') {
+          if (!cardDetails.cvv || cardDetails.cvv.length < 3) {
+            Alert.alert('Error', 'Por favor ingresa el CVV de la tarjeta (3 o 4 dígitos)');
+            return;
+          }
+        }
+        if (savedMethod.type === 'transfer' && !bankDetails.reference) {
+          Alert.alert('Error', 'Ingresa el número de operación de la transferencia');
+          return;
+        }
+      }
+    } else {
+      // Validación para método nuevo
+      if (!selectedMethod) {
+        Alert.alert('Error', 'Selecciona un método de pago');
         return;
+      }
+
+      const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedMethod);
+      if (!selectedPaymentMethod?.available) {
+        Alert.alert('Error', 'Método de pago no disponible');
+        return;
+      }
+
+      if (selectedMethod === 'card') {
+        if (!cardDetails.number || !cardDetails.expiry || !cardDetails.cvv || !cardDetails.name) {
+          Alert.alert('Error', 'Completa todos los datos de la tarjeta');
+          return;
+        }
+      }
+
+      if (selectedMethod === 'transfer') {
+        if (!bankDetails.bank || !bankDetails.account || !bankDetails.reference) {
+          Alert.alert('Error', 'Completa todos los datos de la transferencia');
+          return;
+        }
       }
     }
 
-    if (selectedMethod === 'transfer') {
-      if (!bankDetails.bank || !bankDetails.account || !bankDetails.reference) {
-        Alert.alert('Error', 'Completa todos los datos de la transferencia');
-        return;
-      }
+    // Determinar el método de pago seleccionado
+    let finalPaymentMethod;
+    if (selectedSavedMethod && !useDifferentMethod) {
+      const savedMethod = savedPaymentMethods.find(m => m.id === selectedSavedMethod);
+      finalPaymentMethod = paymentMethods.find(m => m.id === savedMethod?.type);
+    } else {
+      finalPaymentMethod = paymentMethods.find(m => m.id === selectedMethod);
     }
 
-    const processingFee = selectedPaymentMethod.processingFee || 0;
+    if (!finalPaymentMethod) {
+      Alert.alert('Error', 'Método de pago no válido');
+      return;
+    }
+
+    const processingFee = finalPaymentMethod.processingFee || 0;
     const finalTotal = cartSummary.finalTotal + (cartSummary.finalTotal * processingFee);
+
+    const paymentMethodName = selectedSavedMethod && !useDifferentMethod
+      ? savedPaymentMethods.find(m => m.id === selectedSavedMethod)?.name || finalPaymentMethod.name
+      : finalPaymentMethod.name;
 
     Alert.alert(
       'Confirmar Pago',
-      `¿Proceder con el pago de S/ ${finalTotal.toFixed(2)} usando ${selectedPaymentMethod.name}?${
+      `¿Proceder con el pago de S/ ${finalTotal.toFixed(2)} usando ${paymentMethodName}?${
         processingFee > 0 ? `\n\nComisión: S/ ${(cartSummary.finalTotal * processingFee).toFixed(2)}` : ''
       }`,
       [
@@ -355,22 +492,32 @@ function PaymentsContent() {
           </View>
         )}
         
-        {selectedMethod && paymentMethods.find(m => m.id === selectedMethod)?.processingFee && (
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Comisión de procesamiento:</Text>
-            <Text style={styles.summaryValue}>
-              S/ {(cartSummary.finalTotal * (paymentMethods.find(m => m.id === selectedMethod)?.processingFee || 0)).toFixed(2)}
-            </Text>
-          </View>
-        )}
+        {(() => {
+          const currentMethod = selectedSavedMethod && !useDifferentMethod
+            ? paymentMethods.find(m => m.id === savedPaymentMethods.find(sm => sm.id === selectedSavedMethod)?.type)
+            : paymentMethods.find(m => m.id === selectedMethod);
+          const fee = currentMethod?.processingFee || 0;
+          
+          return fee > 0 ? (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Comisión de procesamiento:</Text>
+              <Text style={styles.summaryValue}>
+                S/ {(cartSummary.finalTotal * fee).toFixed(2)}
+              </Text>
+            </View>
+          ) : null;
+        })()}
         
         <View style={[styles.summaryRow, styles.totalRow]}>
           <Text style={styles.totalLabel}>Total:</Text>
           <Text style={styles.totalPrice}>
-            S/ {selectedMethod && paymentMethods.find(m => m.id === selectedMethod)?.processingFee 
-              ? (cartSummary.finalTotal + (cartSummary.finalTotal * (paymentMethods.find(m => m.id === selectedMethod)?.processingFee || 0))).toFixed(2)
-              : cartSummary.finalTotal.toFixed(2)
-            }
+            S/ {(() => {
+              const currentMethod = selectedSavedMethod && !useDifferentMethod
+                ? paymentMethods.find(m => m.id === savedPaymentMethods.find(sm => sm.id === selectedSavedMethod)?.type)
+                : paymentMethods.find(m => m.id === selectedMethod);
+              const fee = currentMethod?.processingFee || 0;
+              return (cartSummary.finalTotal + (cartSummary.finalTotal * fee)).toFixed(2);
+            })()}
           </Text>
         </View>
       </View>
@@ -396,18 +543,117 @@ function PaymentsContent() {
         </View>
       )}
 
-      <View style={styles.paymentMethods}>
-        <Text style={styles.sectionTitle}>Métodos de Pago</Text>
-        {paymentMethods.map((method) => (
-          <View key={method.id}>
-            {renderPaymentMethod(method)}
-          </View>
-        ))}
-      </View>
+      {/* Métodos de pago guardados */}
+      {savedPaymentMethods.length > 0 && !useDifferentMethod && (
+        <View style={styles.savedPaymentMethods}>
+          <Text style={styles.sectionTitle}>Métodos de Pago Guardados</Text>
+          {savedPaymentMethods.map((method) => (
+            <TouchableOpacity
+              key={method.id}
+              style={[
+                styles.savedMethodCard,
+                selectedSavedMethod === method.id && styles.savedMethodCardSelected,
+              ]}
+              onPress={() => handleSelectSavedMethod(method.id)}
+            >
+              <View style={styles.savedMethodHeader}>
+                <Ionicons 
+                  name={
+                    method.type === 'card' ? 'card-outline' :
+                    method.type === 'transfer' ? 'business-outline' :
+                    method.type === 'credit' ? 'document-text-outline' :
+                    'cash-outline'
+                  } 
+                  size={24} 
+                  color={selectedSavedMethod === method.id ? Colors.light.primary : Colors.light.textSecondary} 
+                />
+                <View style={styles.savedMethodInfo}>
+                  <Text style={[
+                    styles.savedMethodName,
+                    selectedSavedMethod === method.id && styles.savedMethodNameSelected
+                  ]}>
+                    {method.name}
+                  </Text>
+                  <Text style={styles.savedMethodType}>
+                    {method.type === 'card' ? 'Tarjeta de Crédito/Débito' :
+                     method.type === 'transfer' ? 'Transferencia Bancaria' :
+                     method.type === 'credit' ? 'Crédito Comercial' :
+                     'Efectivo contra Entrega'}
+                  </Text>
+                  {method.details?.cardNumber && (
+                    <Text style={styles.savedMethodDetails}>
+                      **** {method.details.cardNumber.slice(-4)}
+                    </Text>
+                  )}
+                  {method.details?.bank && (
+                    <Text style={styles.savedMethodDetails}>
+                      {method.details.bank}
+                    </Text>
+                  )}
+                </View>
+                <View style={[
+                  styles.radioButton,
+                  selectedSavedMethod === method.id && styles.radioButtonSelected,
+                ]}>
+                  {selectedSavedMethod === method.id && (
+                    <View style={styles.radioButtonInner} />
+                  )}
+                </View>
+              </View>
+              {method.isDefault && (
+                <View style={styles.defaultBadge}>
+                  <Text style={styles.defaultBadgeText}>Predeterminado</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+          
+          <TouchableOpacity
+            style={styles.useDifferentButton}
+            onPress={handleUseDifferentMethod}
+          >
+            <Ionicons name="add-circle-outline" size={20} color={Colors.light.primary} />
+            <Text style={styles.useDifferentButtonText}>Usar un método de pago diferente</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
-      {selectedMethod === 'card' && (
+      {/* Métodos de pago genéricos (solo si no hay guardados o si eligió usar diferente) */}
+      {(savedPaymentMethods.length === 0 || useDifferentMethod) && (
+        <View style={styles.paymentMethods}>
+          <Text style={styles.sectionTitle}>
+            {savedPaymentMethods.length > 0 ? 'Seleccionar Método de Pago' : 'Métodos de Pago'}
+          </Text>
+          {paymentMethods.map((method) => (
+            <View key={method.id}>
+              {renderPaymentMethod(method)}
+            </View>
+          ))}
+        </View>
+      )}
+
+      {((selectedMethod === 'card') || (selectedSavedMethod && savedPaymentMethods.find(m => m.id === selectedSavedMethod)?.type === 'card')) && (
         <View style={styles.cardDetails}>
           <Text style={styles.sectionTitle}>Datos de la Tarjeta</Text>
+          
+          {selectedSavedMethod && !useDifferentMethod ? (
+            <>
+              <View style={styles.savedMethodInfoBox}>
+                <Text style={styles.savedMethodInfoText}>
+                  Usando tarjeta guardada: {savedPaymentMethods.find(m => m.id === selectedSavedMethod)?.name}
+                </Text>
+                <Text style={styles.savedMethodInfoText}>
+                  **** {savedPaymentMethods.find(m => m.id === selectedSavedMethod)?.details?.cardNumber?.slice(-4)}
+                </Text>
+              </View>
+              <View style={styles.cvvNoticeBox}>
+                <Ionicons name="lock-closed" size={16} color={Colors.light.warning} />
+                <Text style={styles.cvvNoticeText}>
+                  Por seguridad, el CVV no se guarda. Debes ingresarlo en cada compra.
+                </Text>
+              </View>
+            </>
+          ) : null}
           
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Número de Tarjeta</Text>
@@ -418,6 +664,7 @@ function PaymentsContent() {
               onChangeText={(text) => setCardDetails(prev => ({ ...prev, number: text }))}
               keyboardType="numeric"
               maxLength={19}
+              editable={!selectedSavedMethod || useDifferentMethod}
             />
           </View>
 
@@ -431,10 +678,13 @@ function PaymentsContent() {
                 onChangeText={(text) => setCardDetails(prev => ({ ...prev, expiry: text }))}
                 keyboardType="numeric"
                 maxLength={5}
+                editable={!selectedSavedMethod || useDifferentMethod}
               />
             </View>
             <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-              <Text style={styles.inputLabel}>CVV</Text>
+              <Text style={styles.inputLabel}>
+                CVV {selectedSavedMethod && !useDifferentMethod ? '*' : ''}
+              </Text>
               <TextInput
                 style={styles.input}
                 placeholder="123"
@@ -444,23 +694,29 @@ function PaymentsContent() {
                 maxLength={4}
                 secureTextEntry
               />
+              {selectedSavedMethod && !useDifferentMethod && (
+                <Text style={styles.cvvRequiredText}>
+                  Requerido para esta compra
+                </Text>
+              )}
             </View>
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Nombre en la Tarjeta</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Juan Pérez"
-              value={cardDetails.name}
-              onChangeText={(text) => setCardDetails(prev => ({ ...prev, name: text }))}
-              autoCapitalize="words"
-            />
+              <TextInput
+                style={styles.input}
+                placeholder="Juan Pérez"
+                value={cardDetails.name}
+                onChangeText={(text) => setCardDetails(prev => ({ ...prev, name: text }))}
+                autoCapitalize="words"
+                editable={!selectedSavedMethod || useDifferentMethod}
+              />
           </View>
         </View>
       )}
 
-      {selectedMethod === 'transfer' && (
+      {((selectedMethod === 'transfer') || (selectedSavedMethod && savedPaymentMethods.find(m => m.id === selectedSavedMethod)?.type === 'transfer')) && (
         <View style={styles.transferDetails}>
           <Text style={styles.sectionTitle}>Datos de Transferencia</Text>
           
@@ -471,26 +727,39 @@ function PaymentsContent() {
             <Text style={styles.bankInfoText}>CCI: 00219400123456780120</Text>
           </View>
           
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Banco de Origen</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ej: Interbank, Scotiabank, etc."
-              value={bankDetails.bank}
-              onChangeText={(text) => setBankDetails(prev => ({ ...prev, bank: text }))}
-            />
-          </View>
+          {selectedSavedMethod && !useDifferentMethod ? (
+            <View style={styles.savedMethodInfoBox}>
+              <Text style={styles.savedMethodInfoText}>
+                Usando cuenta guardada: {savedPaymentMethods.find(m => m.id === selectedSavedMethod)?.name}
+              </Text>
+              <Text style={styles.savedMethodInfoText}>
+                {savedPaymentMethods.find(m => m.id === selectedSavedMethod)?.details?.bank}
+              </Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Banco de Origen</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ej: Interbank, Scotiabank, etc."
+                  value={bankDetails.bank}
+                  onChangeText={(text) => setBankDetails(prev => ({ ...prev, bank: text }))}
+                />
+              </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Número de Cuenta</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Número de tu cuenta"
-              value={bankDetails.account}
-              onChangeText={(text) => setBankDetails(prev => ({ ...prev, account: text }))}
-              keyboardType="numeric"
-            />
-          </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Número de Cuenta</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Número de tu cuenta"
+                  value={bankDetails.account}
+                  onChangeText={(text) => setBankDetails(prev => ({ ...prev, account: text }))}
+                  keyboardType="numeric"
+                />
+              </View>
+            </>
+          )}
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Número de Operación</Text>
@@ -521,10 +790,14 @@ function PaymentsContent() {
         disabled={!orderValidation.isValid}
       >
         <Text style={styles.payButtonText}>
-          {selectedMethod && paymentMethods.find(m => m.id === selectedMethod)?.processingFee 
-            ? `Pagar S/ ${(cartSummary.finalTotal + (cartSummary.finalTotal * (paymentMethods.find(m => m.id === selectedMethod)?.processingFee || 0))).toFixed(2)}`
-            : `Pagar S/ ${cartSummary.finalTotal.toFixed(2)}`
-          }
+          {(() => {
+            const currentMethod = selectedSavedMethod && !useDifferentMethod
+              ? paymentMethods.find(m => m.id === savedPaymentMethods.find(sm => sm.id === selectedSavedMethod)?.type)
+              : paymentMethods.find(m => m.id === selectedMethod);
+            const fee = currentMethod?.processingFee || 0;
+            const total = cartSummary.finalTotal + (cartSummary.finalTotal * fee);
+            return `Pagar S/ ${total.toFixed(2)}`;
+          })()}
         </Text>
         <Ionicons name="arrow-forward" size={20} color={Colors.light.background} />
       </TouchableOpacity>
@@ -817,5 +1090,117 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.lg,
     fontWeight: '600',
     marginRight: Spacing.sm,
+  },
+  savedPaymentMethods: {
+    backgroundColor: Colors.light.backgroundCard,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    ...Shadows.sm,
+  },
+  savedMethodCard: {
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  savedMethodCardSelected: {
+    borderColor: Colors.light.primary,
+    backgroundColor: Colors.light.backgroundSecondary,
+  },
+  savedMethodHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  savedMethodInfo: {
+    flex: 1,
+    marginLeft: Spacing.md,
+  },
+  savedMethodName: {
+    fontSize: FontSizes.md,
+    fontWeight: '500',
+    color: Colors.light.text,
+    marginBottom: Spacing.xs,
+  },
+  savedMethodNameSelected: {
+    color: Colors.light.primary,
+  },
+  savedMethodType: {
+    fontSize: FontSizes.sm,
+    color: Colors.light.textSecondary,
+    marginBottom: Spacing.xs,
+  },
+  savedMethodDetails: {
+    fontSize: FontSizes.sm,
+    color: Colors.light.textSecondary,
+  },
+  defaultBadge: {
+    backgroundColor: Colors.light.primary,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+    marginTop: Spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  defaultBadgeText: {
+    fontSize: FontSizes.xs,
+    color: Colors.light.background,
+    fontWeight: '600',
+  },
+  useDifferentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.light.backgroundSecondary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.light.primary,
+    borderStyle: 'dashed',
+    marginTop: Spacing.sm,
+  },
+  useDifferentButtonText: {
+    fontSize: FontSizes.md,
+    color: Colors.light.primary,
+    fontWeight: '600',
+    marginLeft: Spacing.sm,
+  },
+  savedMethodInfoBox: {
+    backgroundColor: Colors.light.backgroundSecondary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.light.primary,
+  },
+  savedMethodInfoText: {
+    fontSize: FontSizes.sm,
+    color: Colors.light.text,
+    marginBottom: Spacing.xs,
+  },
+  cvvNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.light.backgroundSecondary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.md,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.light.warning,
+  },
+  cvvNoticeText: {
+    fontSize: FontSizes.sm,
+    color: Colors.light.text,
+    marginLeft: Spacing.sm,
+    flex: 1,
+    lineHeight: 18,
+  },
+  cvvRequiredText: {
+    fontSize: FontSizes.xs,
+    color: Colors.light.warning,
+    marginTop: Spacing.xs,
+    fontStyle: 'italic',
   },
 });

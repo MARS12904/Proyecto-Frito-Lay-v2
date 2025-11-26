@@ -53,6 +53,10 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "supabaseUrl": "https://abledixphpivpvcajhdt.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFibGVkaXhwaHBpdnB2Y2FqaGR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzMTM4NDcsImV4cCI6MjA3ODg4OTg0N30.w26vd6tMo0lMogtjeRgMOTk2bX_yLde0Lr3-qVGigUw"
     }
   }
 }

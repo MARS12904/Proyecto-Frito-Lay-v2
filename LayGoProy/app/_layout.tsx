@@ -17,11 +17,12 @@ export const unstable_settings = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
+
   return (
     <AuthProvider>
       <StockProvider>
-        <OrdersProvider>
-          <MetricsProvider>
+        <MetricsProvider>
+          <OrdersProvider>
             <CartProvider>
               <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
                 <Stack>
@@ -38,8 +39,8 @@ export default function RootLayout() {
                 <StatusBar style="auto" />
               </ThemeProvider>
             </CartProvider>
-          </MetricsProvider>
-        </OrdersProvider>
+          </OrdersProvider>
+        </MetricsProvider>
       </StockProvider>
     </AuthProvider>
   );

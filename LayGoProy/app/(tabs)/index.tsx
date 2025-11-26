@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import DeliveryScheduler from '../../components/DeliveryScheduler';
 import { ResponsiveCard, ResponsiveLayout } from '../../components/ResponsiveLayout';
 import { BorderRadius, Colors, Dimensions, FontSizes, Shadows, Spacing } from '../../constants/theme';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
+import { useMetrics } from '../../contexts/MetricsContext';
+import { useOrders } from '../../contexts/OrdersContext';
 
 export default function HomeScreen() {
   return <HomeContent />;
@@ -21,12 +23,52 @@ function HomeContent() {
     isWholesaleMode, 
     toggleWholesaleMode,
     getCartSummary,
-    deliverySchedule,
-    setDeliverySchedule
   } = useCart();
+  const { getUserMetrics, reloadMetrics } = useMetrics();
+  const { getOrdersByUser } = useOrders();
 
   const [showDeliveryScheduler, setShowDeliveryScheduler] = useState(false);
+  const [lastOrder, setLastOrder] = useState<any>(null);
   const cartSummary = getCartSummary();
+
+  // Recargar métricas cuando el usuario cambia o cuando se monta el componente
+  useEffect(() => {
+    if (user?.id) {
+      reloadMetrics(user.id);
+    }
+  }, [user?.id]);
+
+  // Obtener el último pedido del usuario
+  useEffect(() => {
+    if (user) {
+      const userOrders = getOrdersByUser(user.id);
+      if (userOrders.length > 0) {
+        // Ordenar por fecha descendente y tomar el más reciente que tenga información de entrega
+        const sortedOrders = userOrders
+          .filter(order => order.deliveryAddress) // Solo pedidos con dirección
+          .sort((a, b) => {
+            const dateA = new Date(a.date).getTime();
+            const dateB = new Date(b.date).getTime();
+            return dateB - dateA;
+          });
+        setLastOrder(sortedOrders.length > 0 ? sortedOrders[0] : null);
+      } else {
+        setLastOrder(null);
+      }
+    } else {
+      setLastOrder(null);
+    }
+  }, [user, getOrdersByUser]);
+
+  // Obtener métricas del usuario
+  const merchantStats = user ? getUserMetrics(user.id) : {
+    totalOrders: 0,
+    totalSpent: 0,
+    totalSavings: 0,
+    averageOrderValue: 0,
+    monthlyGoal: 5000,
+    monthlyProgress: 0,
+  };
 
   const handleWholesaleToggle = () => {
     Alert.alert(
@@ -74,49 +116,86 @@ function HomeContent() {
             : 'Precios minoristas - Para compras personales'
           }
         </Text>
+      </ResponsiveCard>      
+
+      {/* Dashboard de Negocio */}
+      <ResponsiveCard style={styles.dashboardCard} padding="lg">
+        <Text style={styles.sectionTitle}>Dashboard de Negocio</Text>
+        <ResponsiveLayout direction="row" justify="space-around" align="center" gap="sm">
+          <View style={styles.dashboardStat}>
+            <Ionicons name="receipt" size={Dimensions.isSmallScreen ? 20 : 24} color={Colors.light.primary} />
+            <Text style={styles.dashboardNumber}>{merchantStats.totalOrders}</Text>
+            <Text style={styles.dashboardLabel}>Pedidos</Text>
+          </View>
+          <View style={styles.dashboardStat}>
+            <Ionicons name="cash" size={Dimensions.isSmallScreen ? 20 : 24} color={Colors.light.success} />
+            <Text style={styles.dashboardNumber}>S/ {merchantStats.totalSpent.toFixed(0)}</Text>
+            <Text style={styles.dashboardLabel}>Gastado</Text>
+          </View>
+          <View style={styles.dashboardStat}>
+            <Ionicons name="trending-down" size={Dimensions.isSmallScreen ? 20 : 24} color={Colors.light.warning} />
+            <Text style={styles.dashboardNumber}>S/ {merchantStats.totalSavings.toFixed(0)}</Text>
+            <Text style={styles.dashboardLabel}>Ahorrado</Text>
+          </View>
+        </ResponsiveLayout>
+        {/* Progreso mensual */}
+        <View style={styles.monthlyProgress}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressTitle}>Meta Mensual</Text>
+            <Text style={styles.progressValue}>
+              S/ {merchantStats.monthlyProgress.toFixed(0)} / S/ {merchantStats.monthlyGoal.toFixed(0)}
+            </Text>
+          </View>
+          <View style={styles.progressBar}>
+            <View 
+              style={[
+                styles.progressFill, 
+                { width: `${Math.min((merchantStats.monthlyProgress / merchantStats.monthlyGoal) * 100, 100)}%` }
+              ]} 
+            />
+          </View>
+        </View>
       </ResponsiveCard>
 
-      {/* Estadísticas del carrito */}
-      <ResponsiveLayout direction="row" justify="space-around" align="center" gap="sm">
-        <ResponsiveCard style={styles.statCard} padding="md">
-          <Ionicons name="cart" size={Dimensions.isSmallScreen ? 20 : 24} color={Colors.light.primary} />
-          <Text style={styles.statNumber}>{totalItems}</Text>
-          <Text style={styles.statLabel}>Productos</Text>
-        </ResponsiveCard>
-        <ResponsiveCard style={styles.statCard} padding="md">
-          <Ionicons name="cash" size={Dimensions.isSmallScreen ? 20 : 24} color={Colors.light.success} />
-          <Text style={styles.statNumber}>S/ {totalPrice.toFixed(2)}</Text>
-          <Text style={styles.statLabel}>Total</Text>
-        </ResponsiveCard>
-        <ResponsiveCard style={styles.statCard} padding="md">
-          <Ionicons name="trending-down" size={Dimensions.isSmallScreen ? 20 : 24} color={Colors.light.warning} />
-          <Text style={styles.statNumber}>S/ {cartSummary.wholesaleSavings.toFixed(2)}</Text>
-          <Text style={styles.statLabel}>Ahorro</Text>
-        </ResponsiveCard>
-      </ResponsiveLayout>
-
-      {/* Programación de entrega */}
-      {isWholesaleMode && (
+      {/* Último Pedido - Información de Entrega */}
+      {isWholesaleMode && lastOrder && lastOrder.deliveryAddress && (
         <View style={styles.deliveryContainer}>
           <View style={styles.deliveryHeader}>
             <Ionicons name="calendar" size={20} color={Colors.light.primary} />
-            <Text style={styles.deliveryTitle}>Entrega Programada</Text>
+            <Text style={styles.deliveryTitle}>Último Pedido - Entrega Programada</Text>
           </View>
-          {deliverySchedule ? (
-            <View style={styles.deliveryInfo}>
-              <Text style={styles.deliveryDate}>{deliverySchedule.date}</Text>
-              <Text style={styles.deliveryTime}>{deliverySchedule.timeSlot}</Text>
-              <Text style={styles.deliveryAddress}>{deliverySchedule.address}</Text>
+          <View style={styles.deliveryInfo}>
+            <View style={styles.orderInfoRow}>
+              <Text style={styles.orderLabel}>Pedido:</Text>
+              <Text style={styles.orderValue}>{lastOrder.id}</Text>
             </View>
-          ) : (
-            <TouchableOpacity 
-              style={styles.scheduleButton}
-              onPress={() => setShowDeliveryScheduler(true)}
-            >
-              <Ionicons name="add-circle" size={20} color={Colors.light.primary} />
-              <Text style={styles.scheduleButtonText}>Programar Entrega</Text>
-            </TouchableOpacity>
-          )}
+            {lastOrder.deliveryDate && (
+              <Text style={styles.deliveryDate}>Fecha: {lastOrder.deliveryDate}</Text>
+            )}
+            {lastOrder.deliveryTimeSlot && (
+              <Text style={styles.deliveryTime}>Horario: {lastOrder.deliveryTimeSlot}</Text>
+            )}
+            <Text style={styles.deliveryAddress}>Dirección: {lastOrder.deliveryAddress}</Text>
+            {lastOrder.paymentMethod && (
+              <Text style={styles.paymentMethod}>Método de pago: {lastOrder.paymentMethod}</Text>
+            )}
+            <View style={styles.orderStatusContainer}>
+              <Text style={styles.orderStatusLabel}>Estado:</Text>
+              <Text style={[
+                styles.orderStatusValue,
+                lastOrder.status === 'delivered' && styles.orderStatusDelivered,
+                lastOrder.status === 'pending' && styles.orderStatusPending,
+                lastOrder.status === 'confirmed' && styles.orderStatusConfirmed,
+              ]}>
+                {lastOrder.status === 'pending' ? 'Pendiente' :
+                 lastOrder.status === 'confirmed' ? 'Confirmado' :
+                 lastOrder.status === 'preparing' ? 'Preparando' :
+                 lastOrder.status === 'shipped' ? 'En camino' :
+                 lastOrder.status === 'delivered' ? 'Entregado' :
+                 lastOrder.status === 'cancelled' ? 'Cancelado' : lastOrder.status}
+              </Text>
+            </View>
+          </View>
         </View>
       )}
 
@@ -186,13 +265,6 @@ function HomeContent() {
         </View>
       </View>
 
-      {/* Modal de programación de entrega */}
-      <DeliveryScheduler
-        visible={showDeliveryScheduler}
-        onClose={() => setShowDeliveryScheduler(false)}
-        onSchedule={setDeliverySchedule}
-        existingSchedule={deliverySchedule}
-      />
     </ScrollView>
   );
 }
@@ -307,6 +379,59 @@ const styles = StyleSheet.create({
   deliveryAddress: {
     fontSize: FontSizes.sm,
     color: Colors.light.textSecondary,
+    marginTop: Spacing.xs,
+  },
+  orderInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.border,
+  },
+  orderLabel: {
+    fontSize: FontSizes.sm,
+    color: Colors.light.textSecondary,
+    fontWeight: '500',
+  },
+  orderValue: {
+    fontSize: FontSizes.md,
+    color: Colors.light.primary,
+    fontWeight: '600',
+  },
+  paymentMethod: {
+    fontSize: FontSizes.sm,
+    color: Colors.light.textSecondary,
+    marginTop: Spacing.xs,
+    fontStyle: 'italic',
+  },
+  orderStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.light.border,
+  },
+  orderStatusLabel: {
+    fontSize: FontSizes.sm,
+    color: Colors.light.textSecondary,
+    marginRight: Spacing.sm,
+  },
+  orderStatusValue: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  orderStatusDelivered: {
+    color: Colors.light.success,
+  },
+  orderStatusPending: {
+    color: Colors.light.warning,
+  },
+  orderStatusConfirmed: {
+    color: Colors.light.primary,
   },
   scheduleButton: {
     flexDirection: 'row',
@@ -378,5 +503,53 @@ const styles = StyleSheet.create({
     color: Colors.light.text,
     marginLeft: Spacing.md,
     flex: 1,
+  },
+  dashboardCard: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+  },
+  dashboardStat: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  dashboardNumber: {
+    fontSize: Dimensions.isSmallScreen ? FontSizes.lg : FontSizes.xl,
+    fontWeight: 'bold',
+    color: Colors.light.text,
+    marginVertical: Spacing.xs,
+  },
+  dashboardLabel: {
+    fontSize: Dimensions.isSmallScreen ? FontSizes.xs : FontSizes.sm,
+    color: Colors.light.textSecondary,
+    textAlign: 'center',
+  },
+  monthlyProgress: {
+    marginTop: Spacing.lg,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  progressTitle: {
+    fontSize: FontSizes.md,
+    fontWeight: '600',
+    color: Colors.light.text,
+  },
+  progressValue: {
+    fontSize: FontSizes.sm,
+    color: Colors.light.textSecondary,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: Colors.light.backgroundSecondary,
+    borderRadius: BorderRadius.sm,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Colors.light.primary,
+    borderRadius: BorderRadius.sm,
   },
 });

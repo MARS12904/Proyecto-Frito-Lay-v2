@@ -8,12 +8,14 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Dimensions,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { router } from 'expo-router';
 import { useCart } from '../../contexts/CartContext';
 import DeliveryScheduler from '../../components/DeliveryScheduler';
 import ProductImage from '../../components/ProductImage';
+import { Colors, Spacing, FontSizes, BorderRadius, Shadows, Dimensions as ThemeDimensions } from '../../constants/theme';
 
 export default function CartScreen() {
   return <CartContent />;
@@ -62,25 +64,12 @@ function CartContent() {
     
     // Si no hay programación de entrega, mostrar el programador primero
     if (!deliverySchedule) {
-      Alert.alert(
-        'Programar Entrega',
-        'Antes de proceder al pago, necesitas programar la entrega de tu pedido.',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Programar Entrega', onPress: () => setShowDeliveryScheduler(true) }
-        ]
-      );
+      setShowDeliveryScheduler(true);
       return;
     }
     
-    Alert.alert(
-      'Proceder al pago',
-      `Total: S/ ${totalPrice.toFixed(2)}\n¿Deseas continuar con el pago?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Continuar', onPress: () => router.push('/payments') }
-      ]
-    );
+    // Ir directamente al pago si ya hay programación de entrega
+    router.push('/payments');
   };
 
   const renderCartItem = ({ item }: { item: any }) => (
@@ -89,7 +78,7 @@ function CartContent() {
         source={{ uri: item.product.image }} 
         style={styles.productImage}
         fallbackIcon="bag-outline"
-        fallbackColor="#007AFF"
+        fallbackColor={Colors.light.primary}
       />
       <View style={styles.itemInfo}>
         <Text style={styles.productName}>{item.product.name}</Text>
@@ -101,7 +90,7 @@ function CartContent() {
             style={styles.quantityButton}
             onPress={() => handleQuantityChange(item.product.id, item.quantity - 1)}
           >
-            <Ionicons name="remove" size={16} color="#007AFF" />
+            <Ionicons name="remove" size={ThemeDimensions.isSmallScreen ? 14 : 16} color={Colors.light.primary} />
           </TouchableOpacity>
           
           <Text style={styles.quantityText}>{item.quantity}</Text>
@@ -110,7 +99,7 @@ function CartContent() {
             style={styles.quantityButton}
             onPress={() => handleQuantityChange(item.product.id, item.quantity + 1)}
           >
-            <Ionicons name="add" size={16} color="#007AFF" />
+            <Ionicons name="add" size={ThemeDimensions.isSmallScreen ? 14 : 16} color={Colors.light.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -123,7 +112,7 @@ function CartContent() {
           style={styles.removeButton}
           onPress={() => handleRemoveItem(item.product.id, item.product.name)}
         >
-          <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+          <Ionicons name="trash-outline" size={ThemeDimensions.isSmallScreen ? 18 : 20} color={Colors.light.error} />
         </TouchableOpacity>
       </View>
     </View>
@@ -132,7 +121,7 @@ function CartContent() {
   if (items.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="cart-outline" size={80} color="#ccc" />
+        <Ionicons name="cart-outline" size={ThemeDimensions.isSmallScreen ? 64 : 80} color={Colors.light.textLight} />
         <Text style={styles.emptyTitle}>Tu carrito está vacío</Text>
         <Text style={styles.emptySubtitle}>
           Agrega algunos productos para comenzar
@@ -146,7 +135,7 @@ function CartContent() {
       <View style={styles.header}>
         <Text style={styles.title}>Carrito de Compras</Text>
         <TouchableOpacity style={styles.clearButton} onPress={handleClearCart}>
-          <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+          <Ionicons name="trash-outline" size={ThemeDimensions.isSmallScreen ? 18 : 20} color={Colors.light.error} />
           <Text style={styles.clearButtonText}>Vaciar</Text>
         </TouchableOpacity>
       </View>
@@ -164,10 +153,10 @@ function CartContent() {
         {deliverySchedule && (
           <View style={styles.deliveryInfo}>
             <View style={styles.deliveryHeader}>
-              <Ionicons name="calendar" size={16} color="#007AFF" />
+              <Ionicons name="calendar" size={ThemeDimensions.isSmallScreen ? 14 : 16} color={Colors.light.primary} />
               <Text style={styles.deliveryTitle}>Entrega Programada</Text>
               <TouchableOpacity onPress={() => setShowDeliveryScheduler(true)}>
-                <Ionicons name="create-outline" size={16} color="#007AFF" />
+                <Ionicons name="create-outline" size={ThemeDimensions.isSmallScreen ? 14 : 16} color={Colors.light.primary} />
               </TouchableOpacity>
             </View>
             <Text style={styles.deliveryDate}>{deliverySchedule.date}</Text>
@@ -197,7 +186,7 @@ function CartContent() {
 
         <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout}>
           <Text style={styles.checkoutButtonText}>Proceder al Pago</Text>
-          <Ionicons name="arrow-forward" size={20} color="#fff" />
+          <Ionicons name="arrow-forward" size={ThemeDimensions.isSmallScreen ? 18 : 20} color={Colors.light.background} />
         </TouchableOpacity>
       </View>
 
@@ -208,11 +197,12 @@ function CartContent() {
         onSchedule={(schedule) => {
           setDeliverySchedule(schedule);
           setShowDeliveryScheduler(false);
-          // Después de programar la entrega, proceder al pago
+          // Después de programar, preguntar si quiere continuar al pago
           Alert.alert(
             'Entrega Programada',
-            '¡Perfecto! Ahora puedes proceder al pago.',
+            '¡Perfecto! ¿Deseas continuar al pago ahora?',
             [
+              { text: 'Más tarde', style: 'cancel' },
               { text: 'Continuar al Pago', onPress: () => router.push('/payments') }
             ]
           );
@@ -226,211 +216,223 @@ function CartContent() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: Colors.light.backgroundSecondary,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    paddingTop: 60,
-    backgroundColor: '#fff',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    paddingTop: ThemeDimensions.isSmallScreen ? Spacing.xxl : 60,
+    backgroundColor: Colors.light.backgroundCard,
     borderBottomWidth: 1,
-    borderBottomColor: '#e1e5e9',
+    borderBottomColor: Colors.light.border,
+    ...Shadows.sm,
   },
   title: {
-    fontSize: 28,
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.xl : FontSizes.xxl,
     fontWeight: 'bold',
-    color: '#333',
+    color: Colors.light.text,
+    flex: 1,
   },
   clearButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
+    padding: Spacing.sm,
   },
   clearButtonText: {
-    color: '#FF3B30',
-    fontSize: 16,
-    marginLeft: 4,
+    color: Colors.light.error,
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
+    marginLeft: Spacing.xs,
+    fontWeight: '500',
   },
   cartList: {
-    padding: 20,
+    padding: Spacing.lg,
   },
   cartItem: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: Colors.light.backgroundCard,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    ...Shadows.sm,
   },
   productImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    marginRight: 12,
+    width: ThemeDimensions.isSmallScreen ? 70 : 80,
+    height: ThemeDimensions.isSmallScreen ? 70 : 80,
+    borderRadius: BorderRadius.md,
+    marginRight: Spacing.md,
   },
   itemInfo: {
     flex: 1,
+    marginRight: Spacing.sm,
   },
   productName: {
-    fontSize: 16,
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
+    color: Colors.light.text,
+    marginBottom: Spacing.xs,
   },
   productPrice: {
-    fontSize: 14,
-    color: '#34C759',
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
+    color: Colors.light.success,
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: Spacing.xs,
   },
   productCategory: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 8,
+    fontSize: FontSizes.xs,
+    color: Colors.light.textSecondary,
+    marginBottom: Spacing.sm,
   },
   quantityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: Spacing.xs,
   },
   quantityButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f0f0f0',
+    width: ThemeDimensions.isSmallScreen ? 28 : 32,
+    height: ThemeDimensions.isSmallScreen ? 28 : 32,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.light.backgroundSecondary,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   quantityText: {
-    fontSize: 16,
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
     fontWeight: '600',
-    color: '#333',
-    marginHorizontal: 16,
+    color: Colors.light.text,
+    marginHorizontal: Spacing.md,
     minWidth: 20,
     textAlign: 'center',
   },
   itemActions: {
     alignItems: 'flex-end',
     justifyContent: 'space-between',
+    minWidth: 80,
   },
   itemTotal: {
-    fontSize: 16,
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+    color: Colors.light.text,
+    marginBottom: Spacing.sm,
   },
   removeButton: {
-    padding: 8,
+    padding: Spacing.sm,
   },
   footer: {
-    backgroundColor: '#fff',
-    padding: 20,
+    backgroundColor: Colors.light.backgroundCard,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: '#e1e5e9',
+    borderTopColor: Colors.light.border,
+    ...Shadows.md,
   },
   deliveryInfo: {
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
+    backgroundColor: Colors.light.backgroundSecondary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
     borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+    borderLeftColor: Colors.light.primary,
   },
   deliveryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: Spacing.sm,
   },
   deliveryTitle: {
-    fontSize: 16,
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
     fontWeight: '600',
-    color: '#333',
-    marginLeft: 8,
+    color: Colors.light.text,
+    marginLeft: Spacing.sm,
     flex: 1,
   },
   deliveryDate: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: FontSizes.sm,
+    color: Colors.light.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '500',
   },
   deliveryTime: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: FontSizes.sm,
+    color: Colors.light.primary,
+    marginBottom: Spacing.xs,
   },
   deliveryAddress: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: FontSizes.sm,
+    color: Colors.light.textSecondary,
+    lineHeight: 20,
   },
   summary: {
-    marginBottom: 20,
+    marginBottom: Spacing.lg,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: Spacing.sm,
   },
   summaryLabel: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
+    color: Colors.light.textSecondary,
   },
   summaryValue: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
+    color: Colors.light.text,
     fontWeight: '500',
   },
   totalRow: {
     borderTopWidth: 1,
-    borderTopColor: '#e1e5e9',
-    paddingTop: 8,
-    marginTop: 8,
+    borderTopColor: Colors.light.border,
+    paddingTop: Spacing.sm,
+    marginTop: Spacing.sm,
   },
   totalLabel: {
-    fontSize: 18,
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.md : FontSizes.lg,
     fontWeight: 'bold',
-    color: '#333',
+    color: Colors.light.text,
   },
   totalValue: {
-    fontSize: 18,
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.md : FontSizes.lg,
     fontWeight: 'bold',
-    color: '#34C759',
+    color: Colors.light.success,
   },
   checkoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    height: 50,
+    backgroundColor: Colors.light.primary,
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    minHeight: ThemeDimensions.isSmallScreen ? 48 : 50,
   },
   checkoutButtonText: {
-    color: '#fff',
-    fontSize: 18,
+    color: Colors.light.background,
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.md : FontSizes.lg,
     fontWeight: '600',
-    marginRight: 8,
+    marginRight: Spacing.sm,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    padding: 40,
+    backgroundColor: Colors.light.backgroundSecondary,
+    padding: Spacing.xl,
   },
   emptyTitle: {
-    fontSize: 24,
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.xl : FontSizes.xxl,
     fontWeight: 'bold',
-    color: '#333',
-    marginTop: 20,
-    marginBottom: 8,
+    color: Colors.light.text,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.sm,
   },
   emptySubtitle: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
+    color: Colors.light.textSecondary,
     textAlign: 'center',
+    paddingHorizontal: Spacing.lg,
   },
 });

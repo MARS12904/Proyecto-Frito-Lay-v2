@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Product, products } from '../data/products';
+import { productsService } from '../services/productsService';
 
 interface StockContextType {
   stock: Record<string, number>;
@@ -104,10 +105,21 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const increaseStock = async (productId: string, quantity: number): Promise<void> => {
     const currentStock = stock[productId] || 0;
+    const newStock = currentStock + Math.max(0, quantity);
+    
+    // Actualizar estado local
     setStock(prev => ({
       ...prev,
-      [productId]: currentStock + Math.max(0, quantity)
+      [productId]: newStock
     }));
+    
+    // Actualizar en Supabase si el producto tiene UUID válido
+    try {
+      await productsService.increaseProductStock(productId, quantity);
+    } catch (error) {
+      console.error('Error actualizando stock en Supabase:', error);
+      // Continuar aunque falle Supabase, el stock local ya se actualizó
+    }
   };
 
   const getProductStock = (productId: string): number => {

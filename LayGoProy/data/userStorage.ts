@@ -1,5 +1,26 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+export interface PaymentMethod {
+  id: string;
+  type: 'card' | 'transfer' | 'cash' | 'credit';
+  name: string;
+  details?: {
+    cardNumber?: string;
+    expiryDate?: string;
+    bank?: string;
+    accountNumber?: string;
+  };
+  isDefault?: boolean;
+}
+
+export interface DeliveryAddress {
+  id: string;
+  address: string;
+  zone?: string;
+  notes?: string;
+  isDefault?: boolean;
+}
+
 export interface StoredUser {
   id: string;
   email: string;
@@ -11,6 +32,8 @@ export interface StoredUser {
     notifications: boolean;
     theme: 'light' | 'dark' | 'auto';
   };
+  paymentMethods?: PaymentMethod[];
+  deliveryAddresses?: DeliveryAddress[];
   createdAt: string;
   lastLogin?: string;
 }

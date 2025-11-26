@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { metricsService } from '../services/metricsService';
 
 export interface UserMetrics {
   userId: string;
@@ -31,7 +32,12 @@ interface MetricsContextType {
     savings: number;
     items: Array<{ name: string; brand: string; quantity: number; subtotal: number }>;
   }) => Promise<void>;
+  revertMetrics: (userId: string, orderData: {
+    total: number;
+    savings: number;
+  }) => Promise<void>;
   getUserMetrics: (userId: string) => UserMetrics;
+  reloadMetrics: (userId: string) => Promise<void>;
   resetMetrics: (userId: string) => Promise<void>;
 }
 
@@ -162,6 +168,27 @@ export const MetricsProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setMetrics(prev => ({ ...prev, [userId]: updatedMetrics }));
   };
 
+  const revertMetrics = async (userId: string, orderData: {
+    total: number;
+    savings: number;
+  }): Promise<void> => {
+    // Recargar métricas desde Supabase para obtener datos actualizados
+    await reloadMetrics(userId);
+  };
+
+  const reloadMetrics = async (userId: string): Promise<void> => {
+    try {
+      // Obtener métricas actualizadas desde Supabase
+      const updatedMetrics = await metricsService.getUserMetrics(userId);
+      setMetrics(prev => ({ ...prev, [userId]: updatedMetrics }));
+    } catch (error) {
+      console.error('Error recargando métricas desde Supabase:', error);
+      // Si falla, revertir localmente como fallback
+      const currentMetrics = getUserMetrics(userId);
+      // No hacer nada si falla, las métricas locales ya están actualizadas
+    }
+  };
+
   const resetMetrics = async (userId: string): Promise<void> => {
     setMetrics(prev => {
       const newMetrics = { ...prev };
@@ -173,9 +200,13 @@ export const MetricsProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const value: MetricsContextType = {
     metrics,
     updateMetrics,
+    revertMetrics,
     getUserMetrics,
+    reloadMetrics,
     resetMetrics,
   };
 
   return <MetricsContext.Provider value={value}>{children}</MetricsContext.Provider>;
 };
+
+

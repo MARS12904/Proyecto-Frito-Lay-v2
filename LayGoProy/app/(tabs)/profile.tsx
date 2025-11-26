@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Alert, 
   Image, 
@@ -29,10 +29,17 @@ const { width: screenWidth } = Dimensions.get('window');
 export default function ProfileScreen() {
   const { user, updateProfile, logout } = useAuth();
   const { clearCart, isWholesaleMode } = useCart();
-  const { getUserMetrics } = useMetrics();
+  const { getUserMetrics, reloadMetrics } = useMetrics();
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     user?.preferences?.notifications ?? true
   );
+
+  // Recargar métricas cuando el usuario cambia o cuando se monta el componente
+  useEffect(() => {
+    if (user?.id) {
+      reloadMetrics(user.id);
+    }
+  }, [user?.id]);
 
   // Obtener métricas reales del usuario
   const merchantStats = user ? getUserMetrics(user.id) : {
@@ -68,8 +75,8 @@ export default function ProfileScreen() {
           text: 'Cerrar Sesión', 
           style: 'destructive',
           onPress: async () => {
+            // No limpiar el carrito al cerrar sesión, se mantiene por usuario
             await logout();
-            clearCart();
             router.replace('/auth/login');
           }
         }
@@ -248,6 +255,52 @@ export default function ProfileScreen() {
               <Ionicons name="lock-closed-outline" size={responsive({ xs: 20, sm: 22, md: 24 })} color={Colors.light.primary} />
             </View>
             <Text style={styles.menuItemText}>Cambiar Contraseña</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={responsive({ xs: 16, sm: 18, md: 20 })} color={Colors.light.textLight} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Sección de métodos de pago */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Métodos de Pago</Text>
+        
+        <TouchableOpacity 
+          style={styles.menuItem} 
+          onPress={() => router.push('/profile/payment-methods')}
+        >
+          <View style={styles.menuItemLeft}>
+            <View style={styles.menuIconContainer}>
+              <Ionicons name="card-outline" size={responsive({ xs: 20, sm: 22, md: 24 })} color={Colors.light.primary} />
+            </View>
+            <Text style={styles.menuItemText}>
+              Gestionar Métodos de Pago
+              {user?.paymentMethods && user.paymentMethods.length > 0 && (
+                <Text style={styles.badgeText}> ({user.paymentMethods.length})</Text>
+              )}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={responsive({ xs: 16, sm: 18, md: 20 })} color={Colors.light.textLight} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Sección de direcciones de entrega */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Direcciones de Entrega</Text>
+        
+        <TouchableOpacity 
+          style={styles.menuItem} 
+          onPress={() => router.push('/profile/delivery-addresses')}
+        >
+          <View style={styles.menuItemLeft}>
+            <View style={styles.menuIconContainer}>
+              <Ionicons name="location-outline" size={responsive({ xs: 20, sm: 22, md: 24 })} color={Colors.light.primary} />
+            </View>
+            <Text style={styles.menuItemText}>
+              Gestionar Direcciones
+              {user?.deliveryAddresses && user.deliveryAddresses.length > 0 && (
+                <Text style={styles.badgeText}> ({user.deliveryAddresses.length})</Text>
+              )}
+            </Text>
           </View>
           <Ionicons name="chevron-forward" size={responsive({ xs: 16, sm: 18, md: 20 })} color={Colors.light.textLight} />
         </TouchableOpacity>
@@ -644,6 +697,11 @@ const styles = StyleSheet.create({
     fontSize: responsive({ xs: 14, sm: 15, md: 16 }),
     color: Colors.light.text,
     fontWeight: '500',
+  },
+  badgeText: {
+    fontSize: responsive({ xs: 12, sm: 13, md: 14 }),
+    color: Colors.light.textSecondary,
+    fontWeight: '400',
   },
 
   // Logout section
