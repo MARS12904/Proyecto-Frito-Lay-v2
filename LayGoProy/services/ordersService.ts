@@ -356,9 +356,10 @@ export const ordersService = {
           
           // Crear los items del pedido
           // Intentar primero con 'price', si falla intentar con 'unit_price'
+          // Solo incluir product_id si es un UUID válido, de lo contrario usar null
           let orderItems = orderData.items.map(item => ({
             order_id: order.id,
-            product_id: item.id,
+            product_id: isValidUUID(item.id) ? item.id : null,
             product_name: item.name,
             product_brand: item.brand,
             quantity: item.quantity,
@@ -382,7 +383,7 @@ export const ordersService = {
             console.warn('Columna price no existe, intentando con unit_price');
             orderItems = orderData.items.map(item => ({
               order_id: order.id,
-              product_id: item.id,
+              product_id: isValidUUID(item.id) ? item.id : null,
               product_name: item.name,
               product_brand: item.brand,
               quantity: item.quantity,
@@ -481,9 +482,10 @@ export const ordersService = {
         
         // Crear los items del pedido
         // Intentar primero con 'price', si falla intentar con 'unit_price'
+        // Solo incluir product_id si es un UUID válido, de lo contrario usar null
         let orderItems = orderData.items.map(item => ({
           order_id: fallbackOrder.id,
-          product_id: item.id,
+          product_id: isValidUUID(item.id) ? item.id : null,
           product_name: item.name,
           product_brand: item.brand,
           quantity: item.quantity,
@@ -504,7 +506,7 @@ export const ordersService = {
           console.warn('Columna price no existe, intentando con unit_price');
           orderItems = orderData.items.map(item => ({
             order_id: fallbackOrder.id,
-            product_id: item.id,
+            product_id: isValidUUID(item.id) ? item.id : null,
             product_name: item.name,
             product_brand: item.brand,
             quantity: item.quantity,
@@ -536,9 +538,10 @@ export const ordersService = {
 
       // Crear los items del pedido
       // Intentar primero con 'price', si falla intentar con 'unit_price'
+      // Solo incluir product_id si es un UUID válido, de lo contrario usar null
       let orderItems = orderData.items.map(item => ({
         order_id: order.id,
-        product_id: item.id,
+        product_id: isValidUUID(item.id) ? item.id : null,
         product_name: item.name,
         product_brand: item.brand,
         quantity: item.quantity,
@@ -559,7 +562,7 @@ export const ordersService = {
         console.warn('Columna price no existe, intentando con unit_price');
         orderItems = orderData.items.map(item => ({
           order_id: order.id,
-          product_id: item.id,
+          product_id: isValidUUID(item.id) ? item.id : null,
           product_name: item.name,
           product_brand: item.brand,
           quantity: item.quantity,

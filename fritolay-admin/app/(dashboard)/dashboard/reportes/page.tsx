@@ -50,26 +50,41 @@ export default async function ReportesPage({ searchParams }: ReportPageProps) {
   const currentPeriod = getPeriodDates(periodType, 0)
   const previousPeriod = comparePeriods ? getPeriodDates(periodType, 1) : null
 
-  // Obtener pedidos del período actual
-  const { data: currentOrders } = await supabase
-    .from('orders')
-    .select('id, total_amount, created_at, status')
+  // Obtener pedidos del período actual desde delivery_orders
+  const { data: currentOrdersRaw } = await supabase
+    .from('delivery_orders')
+    .select('id, total, created_at, status')
     .gte('created_at', currentPeriod.start.toISOString())
     .lte('created_at', currentPeriod.end.toISOString())
+    .or('status.neq.cancelled,status.is.null')
+  
+  // Transformar al formato esperado
+  const currentOrders = (currentOrdersRaw || []).map((o: any) => ({
+    id: o.id,
+    total_amount: o.total || 0,
+    created_at: o.created_at,
+    status: o.status || 'pending'
+  }))
 
   // Obtener pedidos del período anterior si se requiere comparación
   let previousOrders: any[] = []
   if (previousPeriod) {
     const { data } = await supabase
-      .from('orders')
-      .select('id, total_amount, created_at, status')
+      .from('delivery_orders')
+      .select('id, total, created_at, status')
       .gte('created_at', previousPeriod.start.toISOString())
       .lte('created_at', previousPeriod.end.toISOString())
-    previousOrders = data || []
+      .or('status.neq.cancelled,status.is.null')
+    previousOrders = (data || []).map((o: any) => ({
+      id: o.id,
+      total_amount: o.total || 0,
+      created_at: o.created_at,
+      status: o.status || 'pending'
+    }))
   }
 
   // Obtener order_items para calcular totales correctos
-  const currentOrderIds = (currentOrders || []).map(o => o.id)
+  const currentOrderIds = currentOrders.map(o => o.id)
   const previousOrderIds = previousOrders.map(o => o.id)
   
   const { data: currentOrderItems } = currentOrderIds.length > 0
@@ -124,9 +139,9 @@ export default async function ReportesPage({ searchParams }: ReportPageProps) {
       orderTotalsMap.set(item.order_id, current + (quantity * price))
     })
 
-    // Agrupar por fecha
+    // Agrupar por fecha - incluir TODOS los pedidos no cancelados
     orders.forEach(order => {
-      if (order.status === 'completed') {
+      if (order.status !== 'cancelled') {
         const date = new Date(order.created_at)
         let key: string
 
@@ -139,8 +154,8 @@ export default async function ReportesPage({ searchParams }: ReportPageProps) {
         }
 
         if (data[key] !== undefined) {
-          // Usar total calculado desde order_items o fallback a total_amount
-          const orderTotal = orderTotalsMap.get(order.id) || order.total_amount || 0
+          // Usar total_amount directamente (ya viene de delivery_orders.total)
+          const orderTotal = order.total_amount || orderTotalsMap.get(order.id) || 0
           data[key] += orderTotal
         }
       }
@@ -225,23 +240,15 @@ export default async function ReportesPage({ searchParams }: ReportPageProps) {
     previous: previousOrdersData[index]?.current || undefined,
   }))
 
-  // Calcular totales desde order_items
-  const calculateRevenueFromItems = (orders: any[], orderItems: any[]) => {
-    const completedOrderIds = new Set(
-      orders.filter(o => o.status === 'completed').map(o => o.id)
-    )
-    
-    return orderItems
-      .filter(item => completedOrderIds.has(item.order_id))
-      .reduce((sum, item) => {
-        const quantity = Number(item.quantity) || 0
-        const price = Number(item.price) || 0
-        return sum + (quantity * price)
-      }, 0)
+  // Calcular totales directamente desde delivery_orders.total
+  const calculateRevenue = (orders: any[]) => {
+    return orders
+      .filter(o => o.status !== 'cancelled')
+      .reduce((sum, order) => sum + (Number(order.total_amount) || 0), 0)
   }
 
-  const currentRevenue = calculateRevenueFromItems(currentOrders || [], currentOrderItems || [])
-  const previousRevenue = calculateRevenueFromItems(previousOrders, previousOrderItems || [])
+  const currentRevenue = calculateRevenue(currentOrders)
+  const previousRevenue = calculateRevenue(previousOrders)
 
   const revenueGrowth = previousRevenue > 0 
     ? ((currentRevenue - previousRevenue) / previousRevenue) * 100 

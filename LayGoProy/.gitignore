@@ -30,7 +30,11 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# Environment variables (IMPORTANTE: nunca subir credenciales)
+.env
+.env.local
+.env.development
+.env.production
 .env*.local
 
 # typescript
@@ -41,3 +45,13 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Logs
+logs
+*.log
+
+# Editor directories
+.idea/
+.vscode/
+*.swp
+*.swo

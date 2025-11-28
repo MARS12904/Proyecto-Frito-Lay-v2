@@ -29,7 +29,7 @@ export const metricsService = {
       let orders = null;
       let error = null;
       
-      // Intentar primero con delivery_orders
+      // Intentar primero con delivery_orders - incluir TODOS los pedidos no cancelados
       const deliveryOrdersResult = await (supabase as any)
         .from('delivery_orders')
         .select(`
@@ -38,16 +38,21 @@ export const metricsService = {
             quantity,
             price,
             unit_price,
-            products (
-              name,
-              brand
-            )
+            product_name,
+            product_brand,
+            subtotal
           )
         `)
         .eq('created_by', userId)
-        .in('status', ['completed', 'delivered'])
-        .neq('status', 'cancelled')
+        .or('status.neq.cancelled,status.is.null')
+        .eq('is_active', true)
         .order('created_at', { ascending: false });
+      
+      console.log('Metrics query result:', {
+        userId,
+        ordersFound: deliveryOrdersResult.data?.length || 0,
+        error: deliveryOrdersResult.error?.message
+      });
       
       if (deliveryOrdersResult.error || !deliveryOrdersResult.data) {
         // Fallback a orders (vista) sin relaciones
@@ -55,8 +60,7 @@ export const metricsService = {
           .from('orders')
           .select('*')
           .eq('user_id', userId)
-          .in('status', ['completed', 'delivered'])
-          .neq('status', 'cancelled')
+          .or('status.neq.cancelled,status.is.null')
           .order('created_at', { ascending: false });
         
         orders = ordersResult.data;
@@ -100,18 +104,20 @@ export const metricsService = {
       // Calcular métricas
       const totalOrders = orders.length;
       // Usar 'total' si viene de delivery_orders, 'total_amount' si viene de orders
-      const totalSpent = orders.reduce((sum, order) => sum + (order.total || order.total_amount || 0), 0);
-      const totalSavings = orders.reduce((sum, order) => sum + (order.savings || 0), 0);
+      const totalSpent = orders.reduce((sum: number, order: any) => sum + (Number(order.total) || Number(order.total_amount) || 0), 0);
+      const totalSavings = orders.reduce((sum: number, order: any) => sum + (Number(order.savings) || 0), 0);
       const averageOrderValue = totalOrders > 0 ? totalSpent / totalOrders : 0;
+
+      console.log('Metrics calculated:', { totalOrders, totalSpent, totalSavings });
 
       // Calcular productos top
       const productMap = new Map<string, { quantity: number; revenue: number }>();
       orders.forEach((order: any) => {
         (order.order_items || []).forEach((item: any) => {
-          const productName = item.products?.name || item.product_name || 'Producto';
-          const itemPrice = item.unit_price || item.price || 0;
-          const itemQuantity = item.quantity || 0;
-          const itemRevenue = item.subtotal || (itemQuantity * itemPrice);
+          const productName = item.product_name || item.products?.name || 'Producto';
+          const itemPrice = Number(item.price) || Number(item.unit_price) || 0;
+          const itemQuantity = Number(item.quantity) || 0;
+          const itemRevenue = Number(item.subtotal) || (itemQuantity * itemPrice);
           const existing = productMap.get(productName) || { quantity: 0, revenue: 0 };
           productMap.set(productName, {
             quantity: existing.quantity + itemQuantity,
@@ -125,12 +131,25 @@ export const metricsService = {
         .sort((a, b) => b.revenue - a.revenue)
         .slice(0, 3);
 
+      // Función para obtener el label del status
+      const getStatusLabel = (status: string) => {
+        switch (status) {
+          case 'pending': return 'Pendiente';
+          case 'confirmed': return 'Confirmado';
+          case 'preparing': return 'Preparando';
+          case 'shipped': return 'En camino';
+          case 'delivered': return 'Entregado';
+          case 'completed': return 'Completado';
+          default: return 'Pedido';
+        }
+      };
+
       // Calcular actividad reciente
       const recentActivity = orders.slice(0, 10).map((order: any) => ({
         type: 'order' as const,
-        description: `Pedido completado`,
+        description: `Pedido ${getStatusLabel(order.status || 'pending')}`,
         date: order.created_at ? new Date(order.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        amount: order.total || order.total_amount || 0,
+        amount: Number(order.total) || Number(order.total_amount) || 0,
       }));
 
       // Calcular progreso mensual
@@ -140,16 +159,16 @@ export const metricsService = {
         const orderDate = new Date(order.created_at);
         return orderDate >= startOfMonth;
       });
-      const monthlyProgress = monthlyOrders.reduce((sum, order) => sum + (order.total || order.total_amount || 0), 0);
+      const monthlyProgress = monthlyOrders.reduce((sum: number, order: any) => sum + (Number(order.total) || Number(order.total_amount) || 0), 0);
 
       // Determinar marca favorita
       const brandMap = new Map<string, number>();
       orders.forEach((order: any) => {
         (order.order_items || []).forEach((item: any) => {
-          const brand = item.products?.brand || item.product_brand || '';
+          const brand = item.product_brand || item.products?.brand || '';
           if (brand) {
             const count = brandMap.get(brand) || 0;
-            brandMap.set(brand, count + (item.quantity || 0));
+            brandMap.set(brand, count + (Number(item.quantity) || 0));
           }
         });
       });

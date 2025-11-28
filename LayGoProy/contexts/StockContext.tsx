@@ -11,6 +11,7 @@ interface StockContextType {
   getProductStock: (productId: string) => number;
   isProductAvailable: (productId: string, quantity: number) => boolean;
   initializeStock: () => Promise<void>;
+  refreshStockFromDB: () => Promise<void>;
 }
 
 const StockContext = createContext<StockContextType | undefined>(undefined);
@@ -25,34 +26,58 @@ export const useStock = () => {
 
 export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [stock, setStock] = useState<Record<string, number>>({});
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     loadStock();
   }, []);
 
   useEffect(() => {
-    saveStock();
-  }, [stock]);
+    if (isLoaded) {
+      saveStock();
+    }
+  }, [stock, isLoaded]);
 
+  // Cargar stock desde Supabase y luego combinar con datos locales
   const loadStock = async () => {
     try {
-      const stockData = await AsyncStorage.getItem('productStock');
-      if (stockData) {
-        const stored: Record<string, number> = JSON.parse(stockData);
-        // Sincronizar con lista actual de productos: agregar faltantes y remover obsoletos
-        const synced: Record<string, number> = {};
-        products.forEach(product => {
-          const existing = stored[product.id];
-          synced[product.id] = typeof existing === 'number' ? existing : product.stock;
-        });
-        setStock(synced);
-      } else {
-        // Inicializar stock con los valores por defecto de los productos
-        await initializeStock();
-      }
+      // 1. Primero intentar cargar desde Supabase
+      const supabaseStock = await productsService.getAllProductsStock();
+      
+      // 2. Cargar también el stock guardado localmente como respaldo
+      const localStockData = await AsyncStorage.getItem('productStock');
+      const localStock: Record<string, number> = localStockData ? JSON.parse(localStockData) : {};
+      
+      // 3. Combinar: Supabase tiene prioridad, luego local, luego valores por defecto
+      const combinedStock: Record<string, number> = {};
+      
+      products.forEach(product => {
+        // Prioridad: Supabase > AsyncStorage > valor por defecto del producto
+        const supabaseValue = supabaseStock[product.id] ?? supabaseStock[product.name.toLowerCase()];
+        const localValue = localStock[product.id];
+        
+        if (typeof supabaseValue === 'number') {
+          combinedStock[product.id] = supabaseValue;
+        } else if (typeof localValue === 'number') {
+          combinedStock[product.id] = localValue;
+        } else {
+          combinedStock[product.id] = product.stock;
+        }
+      });
+      
+      setStock(combinedStock);
+      setIsLoaded(true);
+      console.log('Stock cargado correctamente');
     } catch (error) {
       console.error('Error loading stock:', error);
+      // En caso de error, usar valores por defecto
+      await initializeStock();
     }
+  };
+
+  // Refrescar stock desde la base de datos
+  const refreshStockFromDB = async (): Promise<void> => {
+    await loadStock();
   };
 
   const saveStock = async () => {
@@ -69,11 +94,13 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       initialStock[product.id] = product.stock;
     });
     setStock(initialStock);
+    setIsLoaded(true);
   };
 
   // Asegurar sincronización si cambia la lista de productos en caliente
   useEffect(() => {
-    // Reconstruir mapa garantizando claves presentes
+    if (!isLoaded) return;
+    
     setStock(prev => {
       const merged: Record<string, number> = {};
       products.forEach(product => {
@@ -82,25 +109,51 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
       return merged;
     });
-  }, [products.length]);
+  }, [products.length, isLoaded]);
 
   const updateStock = async (productId: string, quantity: number): Promise<void> => {
+    const newQuantity = Math.max(0, quantity);
+    
+    // Actualizar estado local
     setStock(prev => ({
       ...prev,
-      [productId]: Math.max(0, quantity)
+      [productId]: newQuantity
     }));
+    
+    // Actualizar en Supabase
+    try {
+      await productsService.updateProductStock(productId, newQuantity);
+    } catch (error) {
+      console.error('Error actualizando stock en Supabase:', error);
+    }
   };
 
   const reduceStock = async (productId: string, quantity: number): Promise<boolean> => {
     const currentStock = stock[productId] || 0;
-    if (currentStock >= quantity) {
-      setStock(prev => ({
-        ...prev,
-        [productId]: Math.max(0, currentStock - quantity)
-      }));
-      return true;
+    
+    if (currentStock < quantity) {
+      console.warn(`Stock insuficiente para ${productId}: disponible ${currentStock}, requerido ${quantity}`);
+      return false;
     }
-    return false;
+    
+    const newStock = Math.max(0, currentStock - quantity);
+    
+    // Actualizar estado local primero
+    setStock(prev => ({
+      ...prev,
+      [productId]: newStock
+    }));
+    
+    // Intentar actualizar en Supabase (si el producto existe allí)
+    try {
+      await productsService.reduceProductStock(productId, quantity);
+      // No mostrar warning si retorna false - simplemente el producto no está en Supabase
+    } catch (error) {
+      // Ignorar errores de Supabase, el stock local ya se actualizó
+    }
+    
+    console.log(`Stock reducido: ${productId} de ${currentStock} a ${newStock}`);
+    return true;
   };
 
   const increaseStock = async (productId: string, quantity: number): Promise<void> => {
@@ -113,13 +166,14 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       [productId]: newStock
     }));
     
-    // Actualizar en Supabase si el producto tiene UUID válido
+    // Intentar actualizar en Supabase (si el producto existe allí)
     try {
       await productsService.increaseProductStock(productId, quantity);
     } catch (error) {
-      console.error('Error actualizando stock en Supabase:', error);
-      // Continuar aunque falle Supabase, el stock local ya se actualizó
+      // Ignorar errores, el stock local ya se actualizó
     }
+    
+    console.log(`Stock aumentado: ${productId} de ${currentStock} a ${newStock}`);
   };
 
   const getProductStock = (productId: string): number => {
@@ -139,6 +193,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     getProductStock,
     isProductAvailable,
     initializeStock,
+    refreshStockFromDB,
   };
 
   return <StockContext.Provider value={value}>{children}</StockContext.Provider>;

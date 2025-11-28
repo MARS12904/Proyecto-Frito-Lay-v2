@@ -58,7 +58,7 @@ function CatalogContent() {
 
     if (isWholesaleMode) {
       setSelectedProduct(product);
-      setQuantity(product.minOrderQuantity);
+      setQuantity(product.minOrderQuantity || 12);
       setShowQuantityModal(true);
     } else {
       const desiredQty = 1;
@@ -89,10 +89,20 @@ function CatalogContent() {
 
   const handleQuantityChange = (newQuantity: number) => {
     if (selectedProduct) {
-      const minQty = selectedProduct.minOrderQuantity;
-      const maxQty = selectedProduct.maxOrderQuantity;
-      const finalQuantity = Math.max(minQty, Math.min(maxQty, newQuantity));
+      // Validar mínimo de 12 productos
+      const minQty = selectedProduct.minOrderQuantity || 12;
+      const finalQuantity = Math.max(minQty, newQuantity);
       setQuantity(finalQuantity);
+    }
+  };
+
+  const handleQuantityTextChange = (text: string) => {
+    const num = parseInt(text, 10);
+    if (!isNaN(num) && num >= 1) {
+      setQuantity(num);
+    } else if (text === '') {
+      // Al borrar, mostrar vacío temporalmente, se validará al confirmar
+      setQuantity(selectedProduct?.minOrderQuantity || 12);
     }
   };
 
@@ -156,13 +166,6 @@ function CatalogContent() {
             </Text>
           </View>
 
-          {isWholesaleMode && (
-            <View style={styles.wholesaleInfo}>
-              <Text style={styles.minOrderText}>
-                Mín: {item.minOrderQuantity} | Máx: {item.maxOrderQuantity}
-              </Text>
-            </View>
-          )}
 
           <TouchableOpacity
             style={[
@@ -260,21 +263,30 @@ function CatalogContent() {
               <TouchableOpacity
                 style={styles.quantityButton}
                 onPress={() => handleQuantityChange(quantity - 1)}
-                disabled={quantity <= (selectedProduct?.minOrderQuantity || 1)}
+                disabled={quantity <= (selectedProduct?.minOrderQuantity || 12)}
               >
                 <Ionicons name="remove" size={20} color={Colors.light.primary} />
               </TouchableOpacity>
               
-              <Text style={styles.quantityText}>{quantity}</Text>
+              <TextInput
+                style={styles.quantityInput}
+                value={String(quantity)}
+                onChangeText={handleQuantityTextChange}
+                keyboardType="number-pad"
+                selectTextOnFocus
+              />
               
               <TouchableOpacity
                 style={styles.quantityButton}
                 onPress={() => handleQuantityChange(quantity + 1)}
-                disabled={quantity >= (selectedProduct?.maxOrderQuantity || 100)}
               >
                 <Ionicons name="add" size={20} color={Colors.light.primary} />
               </TouchableOpacity>
             </View>
+
+            <Text style={styles.minOrderHint}>
+              Mínimo: {selectedProduct?.minOrderQuantity || 12} unidades
+            </Text>
 
             <Text style={styles.totalText}>
               Total: S/ {((selectedProduct?.wholesalePrice || 0) * quantity).toFixed(2)}
@@ -494,14 +506,6 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
     color: Colors.light.textSecondary,
   },
-  wholesaleInfo: {
-    marginBottom: Spacing.sm,
-  },
-  minOrderText: {
-    fontSize: FontSizes.xs,
-    color: Colors.light.warning,
-    textAlign: 'center',
-  },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -576,6 +580,26 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.lg,
     minWidth: 40,
     textAlign: 'center',
+  },
+  quantityInput: {
+    fontSize: FontSizes.xl,
+    fontWeight: 'bold',
+    color: Colors.light.text,
+    marginHorizontal: Spacing.md,
+    minWidth: 60,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.light.backgroundSecondary,
+  },
+  minOrderHint: {
+    fontSize: FontSizes.sm,
+    color: Colors.light.warning,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
   },
   totalText: {
     fontSize: FontSizes.lg,

@@ -21,6 +21,7 @@ import { PAYMENT_LINK_URL } from '../../constants/payments';
 import { router } from 'expo-router';
 import { paymentMethodsService } from '../../services/paymentMethodsService';
 import { PaymentMethod as SavedPaymentMethod } from '../../data/userStorage';
+import { sendOrderConfirmationEmail } from '../../services/emailService';
 
 interface PaymentMethod {
   id: string;
@@ -266,14 +267,44 @@ function PaymentsContent() {
         items: orderItems,
       });
 
-      // 4. Limpiar carrito y programación de entrega
+      // 4. Enviar correo de confirmación
+      const orderForEmail = {
+        id: orderId,
+        date: new Date().toISOString().split('T')[0],
+        status: 'pending' as const,
+        total: cartSummary.finalTotal,
+        wholesaleTotal: cartSummary.totalPrice,
+        savings: cartSummary.wholesaleSavings,
+        items: orderItems,
+        deliveryDate: deliverySchedule?.date,
+        deliveryAddress: deliverySchedule?.address,
+        deliveryTimeSlot: deliverySchedule?.timeSlot,
+        paymentMethod: paymentMethodName,
+        isWholesale: isWholesaleMode,
+        userId: user.id,
+      };
+
+      // Enviar email en segundo plano (no bloquear el flujo)
+      sendOrderConfirmationEmail(orderForEmail, user.email, user.name)
+        .then((success) => {
+          if (success) {
+            console.log('📧 Email de confirmación enviado exitosamente');
+          } else {
+            console.warn('⚠️ No se pudo enviar el email de confirmación');
+          }
+        })
+        .catch((error) => {
+          console.error('❌ Error enviando email:', error);
+        });
+
+      // 5. Limpiar carrito y programación de entrega
       clearCart();
       // Nota: clearCart ya limpia el deliverySchedule, pero lo hacemos explícito
 
-      // 5. Mostrar confirmación
+      // 6. Mostrar confirmación
       Alert.alert(
         '¡Pago Exitoso!',
-        `Tu pedido ${orderId} ha sido procesado exitosamente.\n\nTotal: S/ ${cartSummary.finalTotal.toFixed(2)}\n\nTe enviaremos un correo de confirmación.`,
+        `Tu pedido ${orderId} ha sido procesado exitosamente.\n\nTotal: S/ ${cartSummary.finalTotal.toFixed(2)}\n\nHemos enviado un correo de confirmación a ${user.email}.`,
         [
           {
             text: 'Ver Pedidos',

@@ -157,14 +157,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const addToCart = async (product: Product, quantity: number = 1) => {
-    // Validar cantidad mínima para comerciantes
-    if (isWholesaleMode && quantity < product.minOrderQuantity) {
-      quantity = product.minOrderQuantity;
-    }
-
-    // Validar cantidad máxima
-    if (quantity > product.maxOrderQuantity) {
-      quantity = product.maxOrderQuantity;
+    // Validar cantidad mínima para comerciantes (12 productos)
+    const minQty = product.minOrderQuantity || 12;
+    if (isWholesaleMode && quantity < minQty) {
+      quantity = minQty;
     }
 
     // Validar que haya stock disponible (sin reducirlo aún)
@@ -177,11 +173,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (existingItem) {
       const newQuantity = existingItem.quantity + quantity;
-      const finalQuantity = Math.min(newQuantity, product.maxOrderQuantity);
       
       // Validar stock total disponible
-      const totalNeeded = finalQuantity;
-      if (!isProductAvailable(product.id, totalNeeded)) {
+      if (!isProductAvailable(product.id, newQuantity)) {
         return; // sin cambios si no hay stock suficiente
       }
       
@@ -189,9 +183,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         item.product.id === product.id
           ? {
               ...item,
-              quantity: finalQuantity,
+              quantity: newQuantity,
               unitPrice,
-              subtotal: finalQuantity * unitPrice
+              subtotal: newQuantity * unitPrice
             }
           : item
       ));
@@ -218,19 +212,24 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const item = items.find(i => i.product.id === productId);
     if (!item) return;
-    const clamped = Math.min(quantity, item.product.maxOrderQuantity);
+    
+    // Validar cantidad mínima (12 productos)
+    const minQty = item.product.minOrderQuantity || 12;
+    if (isWholesaleMode && quantity < minQty) {
+      quantity = minQty;
+    }
     
     // Validar que haya stock disponible (sin reducirlo aún)
-    if (!isProductAvailable(productId, clamped)) {
+    if (!isProductAvailable(productId, quantity)) {
       return; // sin cambios si no hay stock suficiente
     }
     
     const unitPrice = isWholesaleMode ? item.product.wholesalePrice : item.product.price;
     setItems(prevItems => prevItems.map(it => it.product.id === productId ? {
       ...it,
-      quantity: clamped,
+      quantity: quantity,
       unitPrice,
-      subtotal: clamped * unitPrice
+      subtotal: quantity * unitPrice
     } : it));
   };
 
@@ -298,11 +297,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     items.forEach(item => {
-      if (item.quantity < item.product.minOrderQuantity) {
-        errors.push(`${item.product.name}: cantidad mínima es ${item.product.minOrderQuantity}`);
-      }
-      if (item.quantity > item.product.maxOrderQuantity) {
-        errors.push(`${item.product.name}: cantidad máxima es ${item.product.maxOrderQuantity}`);
+      const minQty = item.product.minOrderQuantity || 12;
+      if (isWholesaleMode && item.quantity < minQty) {
+        errors.push(`${item.product.name}: cantidad mínima es ${minQty}`);
       }
       if (!item.product.isAvailable) {
         errors.push(`${item.product.name}: producto no disponible`);

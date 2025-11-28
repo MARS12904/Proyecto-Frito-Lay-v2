@@ -8,43 +8,32 @@ export default async function DashboardPage() {
   await requireAdmin()
   const supabase = createAdminServerClient()
 
-  // Obtener métricas
-  // Intentar usar delivery_orders primero, luego fallback a orders
-  let ordersResult, completedOrdersResult;
-  
-  // Intentar con delivery_orders
-  const deliveryOrdersCountResult = await supabase
+  // Obtener métricas desde delivery_orders
+  // Contar TODOS los pedidos (no cancelados)
+  const ordersCountResult = await supabase
     .from('delivery_orders')
     .select('id', { count: 'exact', head: true })
-    .neq('status', 'cancelled')
+    .or('status.neq.cancelled,status.is.null')
+    .eq('is_active', true)
   
-  const deliveryCompletedOrdersResult = await supabase
+  // Obtener TODOS los pedidos para calcular ingresos (no solo completed)
+  const allOrdersResult = await supabase
     .from('delivery_orders')
-    .select('id')
-    .in('status', ['completed', 'delivered'])
-    .neq('status', 'cancelled')
+    .select('id, total, status')
+    .or('status.neq.cancelled,status.is.null')
+    .eq('is_active', true)
   
-  if (deliveryOrdersCountResult.error || deliveryCompletedOrdersResult.error) {
-    console.warn('Error with delivery_orders, falling back to orders:', {
-      countError: deliveryOrdersCountResult.error,
-      completedError: deliveryCompletedOrdersResult.error
-    })
-    // Fallback a orders
-    ordersResult = await supabase
-      .from('orders')
-      .select('id', { count: 'exact', head: true })
-      .neq('status', 'cancelled')
-    
-    completedOrdersResult = await supabase
-      .from('orders')
-      .select('id')
-      .in('status', ['completed', 'delivered'])
-      .neq('status', 'cancelled')
-  } else {
-    ordersResult = deliveryOrdersCountResult
-    completedOrdersResult = deliveryCompletedOrdersResult
-    console.log('Using delivery_orders for dashboard metrics')
-  }
+  // Contar pedidos completados/entregados
+  const completedOrdersResult = await supabase
+    .from('delivery_orders')
+    .select('id', { count: 'exact', head: true })
+    .in('status', ['completed', 'delivered'])
+  
+  // Contar pedidos pendientes
+  const pendingOrdersResult = await supabase
+    .from('delivery_orders')
+    .select('id', { count: 'exact', head: true })
+    .in('status', ['pending', 'confirmed', 'preparing', 'shipped'])
   
   const [usersResult, productsResult] = await Promise.all([
     // Total de usuarios activos
@@ -60,51 +49,20 @@ export default async function DashboardPage() {
   ])
 
   const totalUsers = usersResult.count || 0
-  const totalOrders = ordersResult.count || 0
+  const totalOrders = ordersCountResult.count || 0
   const totalProducts = productsResult.count || 0
+  const completedOrders = completedOrdersResult.count || 0
+  const pendingOrders = pendingOrdersResult.count || 0
   
-  // Calcular ingresos totales desde order_items
-  const completedOrderIds = completedOrdersResult.data?.map((o: any) => o.id) || []
+  // Calcular ingresos totales directamente desde la columna total de delivery_orders
   let totalRevenue = 0
+  const allOrders = allOrdersResult.data || []
   
-  if (completedOrderIds.length > 0) {
-    console.log(`Calculating revenue for ${completedOrderIds.length} completed orders`)
-    
-    // Intentar primero con 'price', luego con 'unit_price'
-    let orderItems = null
-    let itemsError = null
-    
-    const itemsResultWithPrice = await supabase
-      .from('order_items')
-      .select('quantity, price, unit_price')
-      .in('order_id', completedOrderIds)
-    
-    if (itemsResultWithPrice.error) {
-      console.warn('Error loading order items with price column:', itemsResultWithPrice.error)
-      // Intentar solo con unit_price
-      const itemsResultWithUnitPrice = await supabase
-        .from('order_items')
-        .select('quantity, unit_price')
-        .in('order_id', completedOrderIds)
-      
-      if (itemsResultWithUnitPrice.error) {
-        console.error('Error loading order items for revenue:', itemsResultWithUnitPrice.error)
-        itemsError = itemsResultWithUnitPrice.error
-      } else {
-        orderItems = itemsResultWithUnitPrice.data
-      }
-    } else {
-      orderItems = itemsResultWithPrice.data
-    }
-    
-    if (orderItems && !itemsError) {
-      totalRevenue = orderItems.reduce((sum: number, item: any) => {
-        const quantity = Number(item.quantity) || 0
-        const price = Number(item.price || item.unit_price) || 0
-        return sum + (quantity * price)
-      }, 0)
-      console.log(`Total revenue calculated: ${totalRevenue} from ${orderItems.length} items`)
-    }
+  if (allOrders.length > 0) {
+    totalRevenue = allOrders.reduce((sum: number, order: any) => {
+      return sum + (Number(order.total) || 0)
+    }, 0)
+    console.log(`Total revenue: S/ ${totalRevenue} from ${allOrders.length} orders`)
   }
 
   // Obtener conteos por rol
@@ -128,44 +86,28 @@ export default async function DashboardPage() {
 
   const stats = [
     {
-      title: 'Total Usuarios',
-      value: totalUsers.toLocaleString(),
-      icon: Users,
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
-      link: '/dashboard/usuarios',
-    },
-    {
-      title: 'Comerciantes',
-      value: (comerciantesCount || 0).toLocaleString(),
-      icon: Users,
-      color: 'text-secondary',
-      bgColor: 'bg-secondary/10',
-      link: '/dashboard/usuarios?role=comerciante',
-    },
-    {
-      title: 'Repartidores',
-      value: (repartidoresCount || 0).toLocaleString(),
-      icon: Users,
-      color: 'text-accent',
-      bgColor: 'bg-accent/10',
-      link: '/dashboard/repartidores',
-    },
-    {
       title: 'Total Pedidos',
       value: totalOrders.toLocaleString(),
       icon: ShoppingCart,
-      color: 'text-success',
-      bgColor: 'bg-success/10',
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
       link: '/dashboard/pedidos',
     },
     {
-      title: 'Productos',
-      value: totalProducts.toLocaleString(),
-      icon: Package,
+      title: 'Pedidos Pendientes',
+      value: pendingOrders.toLocaleString(),
+      icon: ShoppingCart,
       color: 'text-warning',
       bgColor: 'bg-warning/10',
-      link: '/dashboard/productos',
+      link: '/dashboard/pedidos?status=pending',
+    },
+    {
+      title: 'Pedidos Completados',
+      value: completedOrders.toLocaleString(),
+      icon: ShoppingCart,
+      color: 'text-success',
+      bgColor: 'bg-success/10',
+      link: '/dashboard/pedidos?status=delivered',
     },
     {
       title: 'Ingresos Totales',
@@ -174,6 +116,38 @@ export default async function DashboardPage() {
       color: 'text-error',
       bgColor: 'bg-error/10',
       link: '/dashboard/reportes',
+    },
+    {
+      title: 'Total Usuarios',
+      value: totalUsers.toLocaleString(),
+      icon: Users,
+      color: 'text-secondary',
+      bgColor: 'bg-secondary/10',
+      link: '/dashboard/usuarios',
+    },
+    {
+      title: 'Comerciantes',
+      value: (comerciantesCount || 0).toLocaleString(),
+      icon: Users,
+      color: 'text-accent',
+      bgColor: 'bg-accent/10',
+      link: '/dashboard/usuarios?role=comerciante',
+    },
+    {
+      title: 'Repartidores',
+      value: (repartidoresCount || 0).toLocaleString(),
+      icon: Users,
+      color: 'text-text-secondary',
+      bgColor: 'bg-text-secondary/10',
+      link: '/dashboard/repartidores',
+    },
+    {
+      title: 'Productos',
+      value: totalProducts.toLocaleString(),
+      icon: Package,
+      color: 'text-info',
+      bgColor: 'bg-info/10',
+      link: '/dashboard/productos',
     },
   ]
 

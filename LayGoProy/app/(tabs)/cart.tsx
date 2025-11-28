@@ -6,6 +6,7 @@ import {
     Image,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
     Dimensions,
@@ -31,6 +32,13 @@ function CartContent() {
       removeFromCart(productId);
     } else {
       updateQuantity(productId, quantity);
+    }
+  };
+
+  const handleQuantityTextChange = (productId: string, text: string) => {
+    const num = parseInt(text, 10);
+    if (!isNaN(num) && num > 0) {
+      updateQuantity(productId, num);
     }
   };
 
@@ -93,7 +101,13 @@ function CartContent() {
             <Ionicons name="remove" size={ThemeDimensions.isSmallScreen ? 14 : 16} color={Colors.light.primary} />
           </TouchableOpacity>
           
-          <Text style={styles.quantityText}>{item.quantity}</Text>
+          <TextInput
+            style={styles.quantityInput}
+            value={String(item.quantity)}
+            onChangeText={(text) => handleQuantityTextChange(item.product.id, text)}
+            keyboardType="number-pad"
+            selectTextOnFocus
+          />
           
           <TouchableOpacity
             style={styles.quantityButton}
@@ -307,6 +321,20 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.md,
     minWidth: 20,
     textAlign: 'center',
+  },
+  quantityInput: {
+    fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
+    fontWeight: '600',
+    color: Colors.light.text,
+    marginHorizontal: Spacing.xs,
+    minWidth: ThemeDimensions.isSmallScreen ? 40 : 50,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: BorderRadius.sm,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    backgroundColor: Colors.light.backgroundSecondary,
   },
   itemActions: {
     alignItems: 'flex-end',

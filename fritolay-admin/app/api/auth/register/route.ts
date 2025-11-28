@@ -88,11 +88,11 @@ export async function POST(request: Request) {
       preferences: { notifications: true, theme: 'auto' },
     }
 
-    // Intentar insertar el perfil
+    // Intentar insertar o actualizar el perfil (upsert automático)
     console.log('Creating user profile...', { userId: authData.user.id })
     const { data: profileDataResult, error: profileError } = await adminClient
       .from('user_profiles')
-      .insert(profileData)
+      .upsert(profileData)
       .select()
       .single()
 

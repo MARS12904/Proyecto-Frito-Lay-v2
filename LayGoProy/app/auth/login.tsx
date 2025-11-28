@@ -20,7 +20,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  const { login, biometricLogin } = useAuth();
+  const { login } = useAuth();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -37,18 +37,6 @@ export default function LoginScreen() {
       router.replace('/(tabs)');
     } else {
       Alert.alert('Error', 'Credenciales incorrectas');
-    }
-  };
-
-  const handleBiometricLogin = async () => {
-    setIsLoading(true);
-    const success = await biometricLogin();
-    setIsLoading(false);
-
-    if (success) {
-      router.replace('/(tabs)');
-    } else {
-      Alert.alert('Error', 'Autenticación biométrica fallida');
     }
   };
 
@@ -119,17 +107,6 @@ export default function LoginScreen() {
               {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Text>
           </TouchableOpacity>
-
-          {Platform.OS !== 'web' && (
-            <TouchableOpacity
-              style={styles.biometricButton}
-              onPress={handleBiometricLogin}
-              disabled={isLoading}
-            >
-              <Ionicons name="finger-print" size={24} color="#007AFF" />
-              <Text style={styles.biometricButtonText}>Usar huella dactilar</Text>
-            </TouchableOpacity>
-          )}
 
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>¿No tienes cuenta? </Text>
@@ -206,7 +183,7 @@ const styles = StyleSheet.create({
     height: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
   },
   loginButtonDisabled: {
     backgroundColor: '#ccc',
@@ -215,23 +192,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  biometricButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-    marginBottom: 24,
-  },
-  biometricButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
   },
   registerContainer: {
     flexDirection: 'row',
