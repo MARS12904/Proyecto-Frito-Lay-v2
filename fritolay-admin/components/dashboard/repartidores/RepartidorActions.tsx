@@ -8,7 +8,6 @@ interface Repartidor {
   name: string | null
   email: string
   phone: string | null
-  vehicle_type: string | null
   license_number: string | null
   is_active: boolean | null
   phone_verified: boolean | null
@@ -26,7 +25,6 @@ export default function RepartidorActions({ repartidor, onUpdate }: RepartidorAc
   const [formData, setFormData] = useState({
     name: repartidor.name || '',
     phone: repartidor.phone || '',
-    vehicle_type: repartidor.vehicle_type || '',
     license_number: repartidor.license_number || '',
     is_active: repartidor.is_active ?? true,
   })
@@ -119,18 +117,6 @@ export default function RepartidorActions({ repartidor, onUpdate }: RepartidorAc
             className="px-2 py-1 text-sm border border-border rounded text-text bg-background"
             placeholder="Teléfono"
           />
-          <select
-            name="vehicle_type"
-            value={formData.vehicle_type}
-            onChange={handleChange}
-            className="px-2 py-1 text-sm border border-border rounded text-text bg-background"
-          >
-            <option value="">Tipo de vehículo</option>
-            <option value="moto">Moto</option>
-            <option value="bicicleta">Bicicleta</option>
-            <option value="auto">Auto</option>
-            <option value="camioneta">Camioneta</option>
-          </select>
           <input
             name="license_number"
             value={formData.license_number}
@@ -166,7 +152,6 @@ export default function RepartidorActions({ repartidor, onUpdate }: RepartidorAc
               setFormData({
                 name: repartidor.name || '',
                 phone: repartidor.phone || '',
-                vehicle_type: repartidor.vehicle_type || '',
                 license_number: repartidor.license_number || '',
                 is_active: repartidor.is_active ?? true,
               })

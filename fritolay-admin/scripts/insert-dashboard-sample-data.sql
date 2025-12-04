@@ -41,7 +41,7 @@ BEGIN
   
   -- Insertar perfiles solo si no existen
   -- Según el diagrama: id, email, name, phone, profile_image_url, role, preferences, 
-  -- created_at, updated_at, vehicle_type, license_number, phone_verified, is_active
+  -- created_at, updated_at, license_number, phone_verified, is_active
   INSERT INTO public.user_profiles (id, email, name, role, is_active, phone, preferences)
   VALUES
     (user1_id, 'comerciante1@fritolay.com', 'Juan Pérez', 'comerciante', true, '+51987654321', '{"notifications": true, "theme": "auto"}'::jsonb)
@@ -57,14 +57,14 @@ BEGIN
     (user3_id, 'comerciante3@fritolay.com', 'Carlos López', 'comerciante', true, '+51987654323', '{"notifications": true, "theme": "auto"}'::jsonb)
   ON CONFLICT (id) DO NOTHING;
   
-  INSERT INTO public.user_profiles (id, email, name, role, is_active, phone, vehicle_type, license_number, phone_verified, preferences)
+  INSERT INTO public.user_profiles (id, email, name, role, is_active, phone, license_number, phone_verified, preferences)
   VALUES
-    (user4_id, 'repartidor1@fritolay.com', 'Pedro Martínez', 'repartidor', true, '+51987654324', 'Moto', 'ABC123', false, '{"notifications": true, "theme": "auto"}'::jsonb)
+    (user4_id, 'repartidor1@fritolay.com', 'Pedro Martínez', 'repartidor', true, '+51987654324', 'ABC123', false, '{"notifications": true, "theme": "auto"}'::jsonb)
   ON CONFLICT (id) DO NOTHING;
   
-  INSERT INTO public.user_profiles (id, email, name, role, is_active, phone, vehicle_type, license_number, phone_verified, preferences)
+  INSERT INTO public.user_profiles (id, email, name, role, is_active, phone, license_number, phone_verified, preferences)
   VALUES
-    (user5_id, 'repartidor2@fritolay.com', 'Ana Rodríguez', 'repartidor', true, '+51987654325', 'Auto', 'XYZ789', false, '{"notifications": true, "theme": "auto"}'::jsonb)
+    (user5_id, 'repartidor2@fritolay.com', 'Ana Rodríguez', 'repartidor', true, '+51987654325', 'XYZ789', false, '{"notifications": true, "theme": "auto"}'::jsonb)
   ON CONFLICT (id) DO NOTHING;
   
   RAISE NOTICE 'Perfiles de usuario insertados o actualizados';
@@ -401,7 +401,7 @@ WHERE o.status IN ('completed', 'delivered');
 -- 
 -- 1. user_profiles
 --    - Campos: id, email, name, phone, profile_image_url, role, preferences,
---              created_at, updated_at, vehicle_type, license_number, 
+--              created_at, updated_at, license_number, 
 --              phone_verified, is_active
 --    - Relación: id -> auth.users.id (FK)
 --

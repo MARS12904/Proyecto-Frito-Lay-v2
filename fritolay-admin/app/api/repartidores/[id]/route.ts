@@ -15,7 +15,6 @@ export async function PATCH(request: Request, { params }: Params) {
 
     if (payload.name !== undefined) updateData.name = payload.name.trim()
     if (payload.phone !== undefined) updateData.phone = payload.phone || null
-    if (payload.vehicle_type !== undefined) updateData.vehicle_type = payload.vehicle_type || null
     if (payload.license_number !== undefined) updateData.license_number = payload.license_number || null
     if (payload.is_active !== undefined) updateData.is_active = payload.is_active
     if (payload.phone_verified !== undefined) updateData.phone_verified = payload.phone_verified

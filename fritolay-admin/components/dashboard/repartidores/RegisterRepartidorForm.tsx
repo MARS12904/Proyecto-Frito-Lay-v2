@@ -15,7 +15,6 @@ export default function RegisterRepartidorForm({ onSuccess }: RegisterRepartidor
     password: '',
     confirmPassword: '',
     phone: '',
-    vehicle_type: '',
     license_number: '',
   })
   const [loading, setLoading] = useState(false)
@@ -66,7 +65,6 @@ export default function RegisterRepartidorForm({ onSuccess }: RegisterRepartidor
           email: formData.email.toLowerCase().trim(),
           password: formData.password,
           phone: formData.phone.trim() || null,
-          vehicle_type: formData.vehicle_type || null,
           license_number: formData.license_number.trim() || null,
         }),
       })
@@ -89,7 +87,6 @@ export default function RegisterRepartidorForm({ onSuccess }: RegisterRepartidor
         password: '',
         confirmPassword: '',
         phone: '',
-        vehicle_type: '',
         license_number: '',
       })
 
@@ -222,25 +219,6 @@ export default function RegisterRepartidorForm({ onSuccess }: RegisterRepartidor
               onChange={handleChange}
               className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-text bg-background"
             />
-          </div>
-
-          <div>
-            <label htmlFor="vehicle_type" className="block text-sm font-medium text-text mb-2">
-              Tipo de Vehículo
-            </label>
-            <select
-              id="vehicle_type"
-              name="vehicle_type"
-              value={formData.vehicle_type}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-text bg-background"
-            >
-              <option value="">Seleccionar...</option>
-              <option value="moto">Moto</option>
-              <option value="bicicleta">Bicicleta</option>
-              <option value="auto">Auto</option>
-              <option value="camioneta">Camioneta</option>
-            </select>
           </div>
 
           <div>

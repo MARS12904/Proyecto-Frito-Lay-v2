@@ -32,6 +32,7 @@ export default async function PedidosPage() {
       id: order.id,
       user_id: order.created_by,
       status: order.status,
+      delivery_status: order.delivery_status,
       total_amount: order.total || 0,
       delivery_address: order.delivery_address,
       delivery_date: order.delivery_date,
@@ -92,6 +93,44 @@ export default async function PedidosPage() {
 
   const customerMap = new Map(customers?.map((c) => [c.id, c]) || [])
 
+  // Obtener asignaciones de repartidores para los pedidos
+  let assignmentMap = new Map()
+  
+  if (orderIds.length > 0) {
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from('delivery_assignments')
+      .select('order_id, repartidor_id')
+      .in('order_id', orderIds)
+
+    if (!assignmentsError && assignments && assignments.length > 0) {
+      // Obtener IDs de repartidores únicos
+      const repartidorIds = assignments
+        .map((a: any) => a.repartidor_id)
+        .filter(Boolean)
+        .filter((id: string, index: number, self: string[]) => self.indexOf(id) === index)
+
+      // Obtener perfiles de repartidores
+      if (repartidorIds.length > 0) {
+        const { data: repartidores } = await supabase
+          .from('user_profiles')
+          .select('id, name, email')
+          .in('id', repartidorIds)
+
+        const repartidorMap = new Map(
+          repartidores?.map((r: any) => [r.id, r]) || []
+        )
+
+        // Crear mapa de asignaciones
+        assignments.forEach((assignment: any) => {
+          const repartidor = repartidorMap.get(assignment.repartidor_id)
+          if (repartidor) {
+            assignmentMap.set(assignment.order_id, repartidor)
+          }
+        })
+      }
+    }
+  }
+
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold text-text mb-6">Pedidos</h1>
@@ -113,6 +152,9 @@ export default async function PedidosPage() {
                   Estado
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                  Repartidor
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                   Fecha
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
@@ -121,53 +163,88 @@ export default async function PedidosPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {orders?.map((order) => {
-                const customer = customerMap.get(order.user_id)
-                return (
-                  <tr key={order.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-text font-mono text-sm">
-                      {order.id.slice(0, 8)}...
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-text">
-                      {customer?.name || 'N/A'}
-                      <br />
-                      <span className="text-xs text-text-secondary">{customer?.email}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-text font-bold text-lg">
-                        {formatCurrency(orderTotals.get(order.id) || order.total_amount || 0)}
-                      </div>
-                      <div className="text-xs text-text-secondary mt-1">
-                        {orderItemCounts.get(order.id) || 0} {orderItemCounts.get(order.id) === 1 ? 'item' : 'items'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 text-xs rounded ${
-                          order.status === 'completed'
-                            ? 'bg-success/10 text-success'
-                            : order.status === 'pending'
-                            ? 'bg-warning/10 text-warning'
-                            : 'bg-error/10 text-error'
-                        }`}
-                      >
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-text text-sm">
-                      {formatDateTime(order.created_at)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Link
-                        href={`/dashboard/pedidos/${order.id}`}
-                        className="text-primary hover:text-primary-dark text-sm font-medium"
-                      >
-                        Ver
-                      </Link>
-                    </td>
-                  </tr>
-                )
-              })}
+              {!orders || orders.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-text-secondary">
+                    No hay pedidos registrados
+                  </td>
+                </tr>
+              ) : (
+                orders.map((order: any) => {
+                  const customer = customerMap.get(order.user_id)
+                  const assignment = assignmentMap.get(order.id)
+                  return (
+                    <tr key={order.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-text font-mono text-sm">
+                        {order.id.slice(0, 8)}...
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-text">
+                        {customer?.name || 'N/A'}
+                        <br />
+                        <span className="text-xs text-text-secondary">{customer?.email}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-text font-bold text-lg">
+                          {formatCurrency(orderTotals.get(order.id) || order.total_amount || 0)}
+                        </div>
+                        <div className="text-xs text-text-secondary mt-1">
+                          {orderItemCounts.get(order.id) || 0} {orderItemCounts.get(order.id) === 1 ? 'item' : 'items'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="space-y-1">
+                          <span
+                            className={`px-2 py-1 text-xs rounded ${
+                              order.status === 'completed' || order.status === 'delivered'
+                                ? 'bg-success/10 text-success'
+                                : order.status === 'pending'
+                                ? 'bg-warning/10 text-warning'
+                                : 'bg-error/10 text-error'
+                            }`}
+                          >
+                            {order.status}
+                          </span>
+                          {order.delivery_status && order.delivery_status !== order.status && (
+                            <div>
+                              <span
+                                className={`px-2 py-1 text-xs rounded ${
+                                  order.delivery_status === 'assigned'
+                                    ? 'bg-info/10 text-info'
+                                    : order.delivery_status === 'in_transit'
+                                    ? 'bg-accent/10 text-accent'
+                                    : order.delivery_status === 'delivered'
+                                    ? 'bg-success/10 text-success'
+                                    : 'bg-warning/10 text-warning'
+                                }`}
+                              >
+                                Entrega: {order.delivery_status}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-text text-sm">
+                        {assignment?.name ? (
+                          <span className="text-text">{assignment.name}</span>
+                        ) : (
+                          <span className="text-text-secondary italic">Sin asignar</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-text text-sm">
+                        {formatDateTime(order.created_at)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Link
+                          href={`/dashboard/pedidos/${order.id}`}
+                          className="text-primary hover:text-primary-dark text-sm font-medium"
+                        >
+                          Ver
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
             </tbody>
           </table>
         </div>

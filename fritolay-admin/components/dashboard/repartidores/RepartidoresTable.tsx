@@ -10,7 +10,6 @@ interface Repartidor {
   name: string | null
   email: string
   phone: string | null
-  vehicle_type: string | null
   license_number: string | null
   is_active: boolean | null
   phone_verified: boolean | null
@@ -60,9 +59,6 @@ export default function RepartidoresTable({ initialRepartidores }: RepartidoresT
                   Teléfono
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                  Vehículo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                   Licencia
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
@@ -76,7 +72,7 @@ export default function RepartidoresTable({ initialRepartidores }: RepartidoresT
             <tbody className="divide-y divide-border">
               {repartidores.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-text-secondary">
+                  <td colSpan={6} className="px-6 py-8 text-center text-text-secondary">
                     No hay repartidores registrados
                   </td>
                 </tr>
@@ -89,13 +85,6 @@ export default function RepartidoresTable({ initialRepartidores }: RepartidoresT
                     <td className="px-6 py-4 whitespace-nowrap text-text">{repartidor.email}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-text">
                       {repartidor.phone || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-text">
-                      {repartidor.vehicle_type ? (
-                        <span className="capitalize">{repartidor.vehicle_type}</span>
-                      ) : (
-                        'N/A'
-                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-text">
                       {repartidor.license_number || 'N/A'}

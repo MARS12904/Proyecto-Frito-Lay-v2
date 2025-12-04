@@ -2,70 +2,161 @@
 # PROYECTO FRITO-LAY - GITIGNORE PRINCIPAL
 # ============================================
 
-# Dependencies
+# Dependencies (⚠️ NUNCA subir node_modules)
 node_modules/
+**/node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
 # Environment variables (⚠️ NUNCA subir credenciales)
+# Archivos .env en cualquier ubicación
 .env
+.env.*
+*.env
+**/.env
+**/.env.*
+**/*.env
+
+# Variaciones específicas de .env
 .env.local
 .env.development
 .env.production
+.env.staging
+.env.test
+.env.development.local
+.env.production.local
+.env.test.local
 .env*.local
+.env*.backup
+.env*.old
+.env*.orig
+
+# Archivos de ejemplo de .env (opcional - descomentar si quieres ignorarlos también)
+# .env.example
+# .env.template
+# .env.sample
 
 # Build outputs
 dist/
 build/
 out/
 .next/
+.next/
+**/.next/
 web-build/
+**/web-build/
 
-# Expo
+# Expo (⚠️ NUNCA subir archivos de Expo)
 .expo/
+**/.expo/
 expo-env.d.ts
+**/expo-env.d.ts
+.expo-shared/
+**/.expo-shared/
 
-# Native builds
-/ios
-/android
+# Native builds (⚠️ NUNCA subir builds nativos)
+/ios/
+/android/
+**/ios/
+**/android/
 .kotlin/
+*.apk
+*.aab
+*.ipa
+*.app
 
-# Logs
+# Logs (⚠️ NUNCA subir logs)
 logs/
+**/logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
 
 # Debug
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+.pnpm-debug.log*
 
-# OS files
+# OS files (⚠️ NUNCA subir archivos del sistema)
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
 *.swp
 *.swo
+*~
+~$*
 
-# Editor directories
+# Editor directories (⚠️ NUNCA subir configuraciones del editor)
 .idea/
 .vscode/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
 
 # TypeScript
 *.tsbuildinfo
+**/*.tsbuildinfo
 
-# Keys and certificates
+# Keys and certificates (⚠️ NUNCA subir claves o certificados)
 *.pem
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
+*.keystore
+*.cert
+*.crt
 
 # Metro bundler
 .metro-health-check*
+**/.metro-health-check*
+
+# Testing
+coverage/
+**/coverage/
+.nyc_output/
+**/.nyc_output/
+*.lcov
+
+# Vercel
+.vercel
+**/.vercel
 
 # Misc
 *.orig.*
-coverage/
-.vercel
+.cache/
+**/.cache/
+.turbo/
+**/.turbo/
 
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Database dumps (⚠️ NUNCA subir dumps de base de datos con datos reales)
+*.sql.backup
+*.dump
+*.db
+*.sqlite
+*.sqlite3
+
+# Scripts temporales (opcional - comentar si quieres subir scripts SQL)
+# scripts/*.sql
+# **/scripts/*.sql
+
+# Archivos de ejemplo (opcional - puedes subirlos)
+# *.example
+# *.template

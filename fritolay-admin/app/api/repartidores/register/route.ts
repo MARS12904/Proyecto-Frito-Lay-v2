@@ -5,7 +5,7 @@ export async function POST(request: Request) {
   try {
     const adminClient = createAdminClient()
     const body = await request.json()
-    const { email, password, name, phone, vehicle_type, license_number } = body
+    const { email, password, name, phone, license_number } = body
 
     console.log('Repartidor registration attempt:', { email, name })
 
@@ -82,7 +82,6 @@ export async function POST(request: Request) {
       role: 'repartidor',
       is_active: true,
       phone: phone || null,
-      vehicle_type: vehicle_type || null,
       license_number: license_number || null,
       phone_verified: false,
       preferences: { notifications: true, theme: 'auto' },
