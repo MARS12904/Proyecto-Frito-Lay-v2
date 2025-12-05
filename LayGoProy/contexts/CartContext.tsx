@@ -17,6 +17,7 @@ interface DeliverySchedule {
   date: string;
   timeSlot: string;
   address: string;
+  addressId?: string; // ID de la dirección en delivery_addresses
   notes?: string;
 }
 
@@ -72,7 +73,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = items.reduce((sum, item) => sum + item.subtotal, 0);
-  const wholesaleTotal = items.reduce((sum, item) => sum + (item.product.wholesalePrice * item.quantity), 0);
+  const wholesaleTotal = items.reduce((sum, item) => sum + ((item.product.wholesalePrice || item.product.price) * item.quantity), 0);
   const regularTotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
   useEffect(() => {
@@ -156,6 +157,23 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Función para verificar si un ID es UUID (producto de Supabase)
+  const isUUID = (id: string): boolean => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(id);
+  };
+
+  // Función para validar disponibilidad considerando productos de Supabase
+  const checkProductAvailability = (product: Product, quantity: number): boolean => {
+    // Para productos de Supabase (UUID), usar su propio campo stock
+    if (isUUID(product.id)) {
+      const productStock = product.stock ?? 0;
+      return productStock >= quantity;
+    }
+    // Para productos locales, usar StockContext
+    return isProductAvailable(product.id, quantity);
+  };
+
   const addToCart = async (product: Product, quantity: number = 1) => {
     // Validar cantidad mínima para comerciantes (12 productos)
     const minQty = product.minOrderQuantity || 12;
@@ -164,18 +182,20 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Validar que haya stock disponible (sin reducirlo aún)
-    if (!isProductAvailable(product.id, quantity)) {
+    if (!checkProductAvailability(product, quantity)) {
+      console.warn(`No hay stock suficiente para ${product.name}. Stock: ${product.stock}, Requerido: ${quantity}`);
       return; // no agregar si no hay stock
     }
 
     const existingItem = items.find(item => item.product.id === product.id);
-    const unitPrice = isWholesaleMode ? product.wholesalePrice : product.price;
+    const unitPrice = isWholesaleMode ? (product.wholesalePrice || product.price) : product.price;
 
     if (existingItem) {
       const newQuantity = existingItem.quantity + quantity;
       
       // Validar stock total disponible
-      if (!isProductAvailable(product.id, newQuantity)) {
+      if (!checkProductAvailability(product, newQuantity)) {
+        console.warn(`No hay stock suficiente para aumentar cantidad de ${product.name}`);
         return; // sin cambios si no hay stock suficiente
       }
       
@@ -220,11 +240,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     // Validar que haya stock disponible (sin reducirlo aún)
-    if (!isProductAvailable(productId, quantity)) {
+    if (!checkProductAvailability(item.product, quantity)) {
+      console.warn(`No hay stock suficiente para actualizar ${item.product.name}`);
       return; // sin cambios si no hay stock suficiente
     }
     
-    const unitPrice = isWholesaleMode ? item.product.wholesalePrice : item.product.price;
+    const unitPrice = isWholesaleMode ? (item.product.wholesalePrice || item.product.price) : item.product.price;
     setItems(prevItems => prevItems.map(it => it.product.id === productId ? {
       ...it,
       quantity: quantity,
@@ -257,7 +278,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Actualizar precios en el carrito
     setItems(prevItems =>
       prevItems.map(item => {
-        const unitPrice = newMode ? item.product.wholesalePrice : item.product.price;
+        const unitPrice = newMode 
+          ? (item.product.wholesalePrice || item.product.price) 
+          : item.product.price;
         return {
           ...item,
           unitPrice,

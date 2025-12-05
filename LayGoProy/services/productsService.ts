@@ -1,4 +1,5 @@
 import { supabase, isSupabaseAvailable } from '../lib/supabase';
+import { Product } from '../data/products';
 
 // Función para validar si un string es un UUID válido
 const isValidUUID = (str: string): boolean => {
@@ -6,7 +7,119 @@ const isValidUUID = (str: string): boolean => {
   return uuidRegex.test(str);
 };
 
+// Imagen por defecto para productos sin imagen
+const DEFAULT_PRODUCT_IMAGE = 'https://images.unsplash.com/photo-1621939514649-280e2ee25f60?w=400&q=80';
+
+// Convertir producto de Supabase a formato local
+const convertSupabaseProduct = (dbProduct: any): Product => {
+  // Validar que la imagen sea una URL válida
+  let imageUrl = DEFAULT_PRODUCT_IMAGE;
+  if (dbProduct.image && typeof dbProduct.image === 'string' && dbProduct.image.startsWith('http')) {
+    imageUrl = dbProduct.image;
+  }
+
+  return {
+    id: dbProduct.id,
+    name: dbProduct.name,
+    brand: dbProduct.brand || 'Frito Lay',
+    category: dbProduct.category?.toLowerCase().replace(/\s+/g, '-') || 'otros',
+    subcategory: dbProduct.category?.toLowerCase() || 'general',
+    price: Number(dbProduct.price) || 0,
+    wholesalePrice: Number(dbProduct.wholesale_price) || Number(dbProduct.price) * 0.8,
+    image: imageUrl,
+    description: dbProduct.description || dbProduct.name,
+    weight: dbProduct.weight || '',
+    unit: 'unidad',
+    stock: Number(dbProduct.stock) || 0,
+    minOrderQuantity: Number(dbProduct.min_order_quantity) || 1,
+    maxOrderQuantity: Number(dbProduct.max_order_quantity) || 100,
+    isAvailable: dbProduct.is_available !== false,
+    isWholesale: true,
+    tags: Array.isArray(dbProduct.tags) ? dbProduct.tags : [],
+  };
+};
+
 export const productsService = {
+  // Obtener todos los productos desde Supabase
+  async getAllProducts(): Promise<Product[]> {
+    if (!isSupabaseAvailable() || !supabase) {
+      console.warn('Supabase no disponible, retornando array vacío');
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_available', true)
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching products from Supabase:', error);
+        return [];
+      }
+
+      if (!data || data.length === 0) {
+        console.log('No hay productos en Supabase');
+        return [];
+      }
+
+      const products = data.map(convertSupabaseProduct);
+      console.log(`✅ Cargados ${products.length} productos desde Supabase`);
+      return products;
+    } catch (error) {
+      console.error('Error in getAllProducts:', error);
+      return [];
+    }
+  },
+
+  // Obtener un producto por ID desde Supabase
+  async getProductById(productId: string): Promise<Product | null> {
+    if (!isSupabaseAvailable() || !supabase || !isValidUUID(productId)) {
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+
+      if (error || !data) {
+        return null;
+      }
+
+      return convertSupabaseProduct(data);
+    } catch (error) {
+      console.error('Error in getProductById:', error);
+      return null;
+    }
+  },
+
+  // Obtener categorías únicas de productos
+  async getCategories(): Promise<string[]> {
+    if (!isSupabaseAvailable() || !supabase) {
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('category')
+        .eq('is_available', true);
+
+      if (error || !data) {
+        return [];
+      }
+
+      const categories = [...new Set(data.map(p => p.category).filter(Boolean))];
+      return categories;
+    } catch (error) {
+      console.error('Error in getCategories:', error);
+      return [];
+    }
+  },
   // Obtener todos los productos de Supabase con su stock
   async getAllProductsStock(): Promise<Record<string, number>> {
     if (!isSupabaseAvailable()) {

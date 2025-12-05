@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { DeliveryService, DeliveryAssignment } from '../../services/deliveryService';
+import { useResponsive } from '../../hooks/useResponsive';
+import { Colors, BorderRadius, Shadows, DeliveryStatusColors, DeliveryStatusText } from '../../constants/theme';
 
 export default function OrdersScreen() {
   const { user } = useAuth();
@@ -19,6 +21,7 @@ export default function OrdersScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'assigned' | 'in_transit' | 'delivered'>('all');
+  const { fs, sp, wp, isTablet, isSmallPhone, isLandscape, width } = useResponsive();
 
   useEffect(() => {
     loadAssignments();
@@ -45,50 +48,92 @@ export default function OrdersScreen() {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'assigned':
-        return '#FFA500';
-      case 'in_transit':
-        return '#007AFF';
-      case 'delivered':
-        return '#34C759';
-      case 'failed':
-        return '#FF3B30';
-      default:
-        return '#666';
-    }
+    return DeliveryStatusColors[status as keyof typeof DeliveryStatusColors] || Colors.textSecondary;
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
-      case 'assigned':
-        return 'Asignado';
-      case 'in_transit':
-        return 'En Tránsito';
-      case 'delivered':
-        return 'Entregado';
-      case 'failed':
-        return 'Fallido';
-      default:
-        return status;
-    }
+    return DeliveryStatusText[status] || status;
   };
 
   const filteredAssignments = filter === 'all'
     ? assignments
     : assignments.filter(a => a.status === filter);
 
-  const renderOrderItem = ({ item }: { item: DeliveryAssignment }) => (
+  // Estilos dinámicos responsive
+  const dynamicStyles = {
+    filterContainer: {
+      paddingVertical: sp(isTablet ? 16 : 12),
+      paddingHorizontal: sp(isTablet ? 20 : 16),
+    },
+    filterButton: {
+      paddingHorizontal: sp(isTablet ? 20 : 16),
+      paddingVertical: sp(isTablet ? 10 : 8),
+      marginRight: sp(isTablet ? 12 : 8),
+    },
+    filterText: {
+      fontSize: fs(isTablet ? 16 : 14),
+    },
+    listContent: {
+      padding: sp(isTablet ? 20 : 16),
+      maxWidth: isTablet ? 800 : undefined,
+      alignSelf: isTablet ? 'center' as const : undefined,
+      width: isTablet ? '100%' : undefined,
+    },
+    orderCard: {
+      padding: sp(isTablet ? 20 : 16),
+      marginBottom: sp(isTablet ? 16 : 12),
+    },
+    orderNumber: {
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    orderDate: {
+      fontSize: fs(isTablet ? 14 : 12),
+    },
+    statusBadge: {
+      paddingHorizontal: sp(isTablet ? 16 : 12),
+      paddingVertical: sp(isTablet ? 8 : 6),
+    },
+    statusText: {
+      fontSize: fs(isTablet ? 14 : 12),
+    },
+    addressText: {
+      fontSize: fs(isTablet ? 16 : 14),
+    },
+    orderTotal: {
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    emptyIconSize: isTablet ? 80 : 64,
+    emptyText: {
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    locationIconSize: isTablet ? 20 : 16,
+    chevronSize: isTablet ? 24 : 20,
+    // Calcular número de columnas para tablets en landscape
+    numColumns: isTablet && isLandscape ? 2 : 1,
+    columnWrapper: isTablet && isLandscape ? {
+      gap: sp(16),
+    } : undefined,
+    cardFlex: isTablet && isLandscape ? {
+      flex: 1,
+      maxWidth: (width - sp(56)) / 2,
+    } : undefined,
+  };
+
+  const renderOrderItem = ({ item, index }: { item: DeliveryAssignment; index: number }) => (
     <TouchableOpacity
-      style={styles.orderCard}
+      style={[
+        styles.orderCard, 
+        dynamicStyles.orderCard,
+        dynamicStyles.cardFlex,
+      ]}
       onPress={() => router.push(`/orders/${item.id}`)}
     >
       <View style={styles.orderHeader}>
         <View style={styles.orderInfo}>
-          <Text style={styles.orderNumber}>
+          <Text style={[styles.orderNumber, dynamicStyles.orderNumber]}>
             Pedido #{item.order?.order_number || 'N/A'}
           </Text>
-          <Text style={styles.orderDate}>
+          <Text style={[styles.orderDate, dynamicStyles.orderDate]}>
             {new Date(item.assigned_at).toLocaleDateString('es-ES', {
               day: 'numeric',
               month: 'short',
@@ -101,12 +146,14 @@ export default function OrdersScreen() {
         <View
           style={[
             styles.statusBadge,
+            dynamicStyles.statusBadge,
             { backgroundColor: getStatusColor(item.status) + '20' },
           ]}
         >
           <Text
             style={[
               styles.statusText,
+              dynamicStyles.statusText,
               { color: getStatusColor(item.status) },
             ]}
           >
@@ -117,8 +164,8 @@ export default function OrdersScreen() {
 
       {item.order?.delivery_address && (
         <View style={styles.orderAddress}>
-          <Ionicons name="location-outline" size={16} color="#666" />
-          <Text style={styles.addressText} numberOfLines={2}>
+          <Ionicons name="location-outline" size={dynamicStyles.locationIconSize} color={Colors.textSecondary} />
+          <Text style={[styles.addressText, dynamicStyles.addressText]} numberOfLines={2}>
             {item.order.delivery_address}
           </Text>
         </View>
@@ -126,10 +173,10 @@ export default function OrdersScreen() {
 
       {item.order?.total && (
         <View style={styles.orderFooter}>
-          <Text style={styles.orderTotal}>
+          <Text style={[styles.orderTotal, dynamicStyles.orderTotal]}>
             Total: S/. {item.order.total.toFixed(2)}
           </Text>
-          <Ionicons name="chevron-forward" size={20} color="#ccc" />
+          <Ionicons name="chevron-forward" size={dynamicStyles.chevronSize} color={Colors.textLight} />
         </View>
       )}
     </TouchableOpacity>
@@ -138,7 +185,7 @@ export default function OrdersScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
@@ -146,13 +193,14 @@ export default function OrdersScreen() {
   return (
     <View style={styles.container}>
       {/* Filtros */}
-      <View style={styles.filterContainer}>
+      <View style={[styles.filterContainer, dynamicStyles.filterContainer]}>
         <View style={styles.filterRow}>
           {(['all', 'assigned', 'in_transit', 'delivered'] as const).map((filterOption) => (
             <TouchableOpacity
               key={filterOption}
               style={[
                 styles.filterButton,
+                dynamicStyles.filterButton,
                 filter === filterOption && styles.filterButtonActive,
               ]}
               onPress={() => setFilter(filterOption)}
@@ -160,6 +208,7 @@ export default function OrdersScreen() {
               <Text
                 style={[
                   styles.filterText,
+                  dynamicStyles.filterText,
                   filter === filterOption && styles.filterTextActive,
                 ]}
               >
@@ -172,8 +221,8 @@ export default function OrdersScreen() {
 
       {filteredAssignments.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="document-text-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>
+          <Ionicons name="document-text-outline" size={dynamicStyles.emptyIconSize} color={Colors.textLight} />
+          <Text style={[styles.emptyText, dynamicStyles.emptyText]}>
             {filter === 'all'
               ? 'No tienes pedidos asignados'
               : `No hay pedidos ${getStatusText(filter).toLowerCase()}`}
@@ -184,10 +233,14 @@ export default function OrdersScreen() {
           data={filteredAssignments}
           renderItem={renderOrderItem}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
+          key={dynamicStyles.numColumns}
+          numColumns={dynamicStyles.numColumns}
+          columnWrapperStyle={dynamicStyles.numColumns > 1 ? dynamicStyles.columnWrapper : undefined}
+          contentContainerStyle={dynamicStyles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
+          showsVerticalScrollIndicator={false}
         />
       )}
     </View>
@@ -197,7 +250,7 @@ export default function OrdersScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: Colors.background,
   },
   loadingContainer: {
     flex: 1,
@@ -205,11 +258,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   filterContainer: {
-    backgroundColor: '#fff',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    backgroundColor: Colors.backgroundCard,
     borderBottomWidth: 1,
-    borderBottomColor: '#e1e5e9',
+    borderBottomColor: Colors.border,
+    ...Shadows.sm,
   },
   filterRow: {
     flexDirection: 'row',
@@ -217,33 +269,26 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    marginRight: 8,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.backgroundSecondary,
   },
   filterButtonActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: Colors.primary,
   },
   filterText: {
-    fontSize: 14,
-    color: '#666',
+    color: Colors.textSecondary,
     fontWeight: '500',
   },
   filterTextActive: {
-    color: '#fff',
+    color: Colors.white,
   },
-  listContent: {
-    padding: 16,
-  },
+  listContent: {},
   orderCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#e1e5e9',
+    borderColor: Colors.border,
+    ...Shadows.sm,
   },
   orderHeader: {
     flexDirection: 'row',
@@ -255,22 +300,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   orderNumber: {
-    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: Colors.text,
     marginBottom: 4,
   },
   orderDate: {
-    fontSize: 12,
-    color: '#666',
+    color: Colors.textSecondary,
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: BorderRadius.md,
   },
   statusText: {
-    fontSize: 12,
     fontWeight: '600',
   },
   orderAddress: {
@@ -279,8 +319,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   addressText: {
-    fontSize: 14,
-    color: '#666',
+    color: Colors.textSecondary,
     marginLeft: 8,
     flex: 1,
   },
@@ -290,12 +329,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#e1e5e9',
+    borderTopColor: Colors.borderLight,
   },
   orderTotal: {
-    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: Colors.text,
   },
   emptyContainer: {
     flex: 1,
@@ -305,9 +343,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     marginTop: 16,
-    fontSize: 16,
-    color: '#999',
+    color: Colors.textLight,
     textAlign: 'center',
   },
 });
-

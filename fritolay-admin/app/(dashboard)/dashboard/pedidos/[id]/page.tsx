@@ -48,13 +48,13 @@ export default async function PedidoDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  // Obtener los items del pedido
+  // Obtener los items del pedido (incluye product_name y product_brand guardados)
   const { data: orderItems } = await supabase
     .from('order_items')
-    .select('id, quantity, price, product_id')
+    .select('id, quantity, price, product_id, product_name, product_brand, subtotal, weight')
     .eq('order_id', id)
 
-  // Obtener los productos asociados
+  // Obtener los productos asociados para imagen (opcional)
   const productIds = orderItems?.map(item => item.product_id).filter(Boolean) || []
   let products: any[] = []
   if (productIds.length > 0) {
@@ -65,12 +65,20 @@ export default async function PedidoDetailPage({ params }: PageProps) {
     products = productsData || []
   }
 
-  // Combinar items con productos y calcular total
-  const itemsWithProducts = orderItems?.map(item => ({
-    ...item,
-    product: products.find(p => p.id === item.product_id) || null,
-    subtotal: (item.quantity || 0) * (item.price || 0),
-  })) || []
+  // Combinar items con productos (usando product_name guardado como principal)
+  const itemsWithProducts = orderItems?.map(item => {
+    const product = products.find(p => p.id === item.product_id)
+    return {
+      ...item,
+      product: {
+        name: item.product_name || product?.name || 'Producto sin nombre',
+        brand: item.product_brand || product?.brand || '',
+        image: product?.image || null,
+        category: product?.category || null,
+      },
+      subtotal: item.subtotal || (item.quantity || 0) * (item.price || 0),
+    }
+  }) || []
 
   // Calcular total desde order_items
   const calculatedTotal = itemsWithProducts.reduce((sum, item) => {

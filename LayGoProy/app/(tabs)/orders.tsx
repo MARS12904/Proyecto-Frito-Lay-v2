@@ -14,6 +14,28 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useOrders } from '../../contexts/OrdersContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '../../constants/theme';
 
+// Función para parsear fecha YYYY-MM-DD sin problemas de zona horaria
+const parseLocalDate = (dateStr: string): Date => {
+  if (!dateStr) return new Date();
+  // Si ya es un formato con hora, usar Date directamente
+  if (dateStr.includes('T') || dateStr.includes(' ')) {
+    return new Date(dateStr);
+  }
+  // Para formato YYYY-MM-DD, parsear manualmente para evitar problemas de UTC
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+// Función para formatear fecha para mostrar
+const formatDate = (dateStr: string, options?: Intl.DateTimeFormatOptions): string => {
+  const date = parseLocalDate(dateStr);
+  return date.toLocaleDateString('es-PE', options || {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};
+
 interface OrderItem {
   id: string;
   name: string;
@@ -191,7 +213,7 @@ function OrdersContent() {
           <View style={styles.orderInfo}>
             <Text style={styles.orderId}>Pedido {item.id}</Text>
             <Text style={styles.orderDate}>
-              {new Date(item.date).toLocaleDateString('es-PE', {
+              {formatDate(item.date, {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric'
@@ -358,7 +380,7 @@ function OrdersContent() {
                     <Ionicons name="calendar" size={16} color={Colors.light.primary} />
                     <Text style={styles.infoLabel}>Fecha del pedido:</Text>
                     <Text style={styles.infoValue}>
-                      {new Date(selectedOrder.date).toLocaleDateString('es-PE', {
+                      {formatDate(selectedOrder.date, {
                         weekday: 'long',
                         year: 'numeric',
                         month: 'long',
@@ -372,7 +394,7 @@ function OrdersContent() {
                       <Ionicons name="car" size={16} color={Colors.light.primary} />
                       <Text style={styles.infoLabel}>Fecha de entrega:</Text>
                       <Text style={styles.infoValue}>
-                        {new Date(selectedOrder.deliveryDate).toLocaleDateString('es-PE', {
+                        {formatDate(selectedOrder.deliveryDate, {
                           weekday: 'long',
                           year: 'numeric',
                           month: 'long',

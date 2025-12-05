@@ -1,10 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { Product } from '../data/products';
 import { ordersService } from '../services/ordersService';
 import { useAuth } from './AuthContext';
 import { useStock } from './StockContext';
 import { useMetrics } from './MetricsContext';
+import { supabase, isSupabaseAvailable } from '../lib/supabase';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface OrderItem {
   id: string;
@@ -27,6 +29,7 @@ export interface Order {
   trackingNumber?: string;
   deliveryDate?: string;
   deliveryAddress?: string;
+  deliveryAddressId?: string; // ID de la dirección en delivery_addresses
   deliveryTimeSlot?: string;
   paymentMethod: string;
   isWholesale: boolean;
@@ -41,6 +44,8 @@ interface OrdersContextType {
   getOrdersByUser: (userId: string) => Order[];
   getOrderById: (orderId: string) => Order | undefined;
   clearOrders: () => Promise<void>;
+  refreshOrders: () => Promise<void>;
+  isLoading: boolean;
 }
 
 const OrdersContext = createContext<OrdersContextType | undefined>(undefined);
@@ -55,19 +60,17 @@ export const useOrders = () => {
 
 export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
   const { increaseStock } = useStock();
   const { reloadMetrics } = useMetrics();
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
-  useEffect(() => {
-    if (user?.id) {
-      loadOrders();
-    }
-  }, [user?.id]);
-
-  const loadOrders = async () => {
+  // Cargar pedidos
+  const loadOrders = useCallback(async () => {
     if (!user?.id) return;
     
+    setIsLoading(true);
     try {
       // Intentar cargar desde Supabase primero
       const supabaseOrders = await ordersService.getOrdersByUser(user.id);
@@ -97,8 +100,81 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       } catch (e) {
         console.error('Error loading from AsyncStorage:', e);
       }
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  // Función para refrescar pedidos manualmente
+  const refreshOrders = useCallback(async () => {
+    await loadOrders();
+  }, [loadOrders]);
+
+  // Configurar suscripción en tiempo real
+  useEffect(() => {
+    if (!user?.id || !isSupabaseAvailable() || !supabase) {
+      return;
+    }
+
+    // Limpiar suscripción anterior si existe
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
+    // Crear nueva suscripción para cambios en delivery_orders del usuario
+    const channel = supabase
+      .channel(`orders-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Escuchar INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'delivery_orders',
+          filter: `created_by=eq.${user.id}`,
+        },
+        async (payload) => {
+          console.log('📦 Cambio en pedido detectado:', payload.eventType);
+          
+          if (payload.eventType === 'UPDATE') {
+            // Actualizar el pedido específico en el estado local
+            const updatedOrder = payload.new as any;
+            setOrders(prev => prev.map(order => {
+              if (order.id === updatedOrder.id) {
+                return {
+                  ...order,
+                  status: updatedOrder.status,
+                  // Mapear otros campos que puedan cambiar
+                };
+              }
+              return order;
+            }));
+          } else {
+            // Para INSERT o DELETE, recargar todos los pedidos
+            await loadOrders();
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Estado de suscripción de pedidos:', status);
+      });
+
+    channelRef.current = channel;
+
+    // Limpiar al desmontar
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [user?.id, loadOrders]);
+
+  // Cargar pedidos iniciales
+  useEffect(() => {
+    if (user?.id) {
+      loadOrders();
+    }
+  }, [user?.id, loadOrders]);
 
   const generateOrderId = (): string => {
     const year = new Date().getFullYear();
@@ -220,6 +296,8 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     getOrdersByUser,
     getOrderById,
     clearOrders,
+    refreshOrders,
+    isLoading,
   };
 
   return <OrdersContext.Provider value={value}>{children}</OrdersContext.Provider>;

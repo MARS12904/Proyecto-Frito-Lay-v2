@@ -12,12 +12,15 @@ import {
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { DeliveryService, DeliveryAssignment } from '../../services/deliveryService';
+import { useResponsive } from '../../hooks/useResponsive';
+import { Colors, BorderRadius, Shadows, DeliveryStatusColors, DeliveryStatusText } from '../../constants/theme';
 
 export default function DashboardScreen() {
   const { user } = useAuth();
   const [assignments, setAssignments] = useState<DeliveryAssignment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { fs, sp, wp, isTablet, isSmallPhone, isLandscape } = useResponsive();
 
   useEffect(() => {
     loadAssignments();
@@ -44,33 +47,11 @@ export default function DashboardScreen() {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'assigned':
-        return '#FFA500';
-      case 'in_transit':
-        return '#007AFF';
-      case 'delivered':
-        return '#34C759';
-      case 'failed':
-        return '#FF3B30';
-      default:
-        return '#666';
-    }
+    return DeliveryStatusColors[status as keyof typeof DeliveryStatusColors] || Colors.textSecondary;
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
-      case 'assigned':
-        return 'Asignado';
-      case 'in_transit':
-        return 'En Tránsito';
-      case 'delivered':
-        return 'Entregado';
-      case 'failed':
-        return 'Fallido';
-      default:
-        return status;
-    }
+    return DeliveryStatusText[status] || status;
   };
 
   const stats = {
@@ -80,10 +61,77 @@ export default function DashboardScreen() {
     delivered: assignments.filter(a => a.status === 'delivered').length,
   };
 
+  // Estilos dinámicos responsive
+  const dynamicStyles = {
+    header: {
+      padding: sp(isTablet ? 28 : 20),
+      paddingTop: sp(isTablet ? 32 : 20),
+    },
+    greeting: {
+      fontSize: fs(isTablet ? 28 : 24),
+    },
+    subtitle: {
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    statsContainer: {
+      padding: sp(isTablet ? 20 : 16),
+      gap: sp(isTablet ? 16 : 12),
+      flexDirection: (isLandscape && isTablet ? 'row' : 'row') as 'row',
+      flexWrap: 'wrap' as const,
+    },
+    statCard: {
+      flex: isTablet && isLandscape ? undefined : 1,
+      minWidth: isTablet ? wp(20) : wp(22),
+      padding: sp(isTablet ? 20 : 16),
+    },
+    statNumber: {
+      fontSize: fs(isTablet ? 28 : 24),
+    },
+    statLabel: {
+      fontSize: fs(isTablet ? 14 : 12),
+    },
+    section: {
+      padding: sp(isTablet ? 20 : 16),
+    },
+    sectionTitle: {
+      fontSize: fs(isTablet ? 20 : 18),
+      marginBottom: sp(isTablet ? 16 : 12),
+    },
+    orderCard: {
+      padding: sp(isTablet ? 20 : 16),
+      marginBottom: sp(isTablet ? 16 : 12),
+    },
+    orderNumber: {
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    orderDate: {
+      fontSize: fs(isTablet ? 14 : 12),
+    },
+    statusBadge: {
+      paddingHorizontal: sp(isTablet ? 16 : 12),
+      paddingVertical: sp(isTablet ? 8 : 6),
+    },
+    statusText: {
+      fontSize: fs(isTablet ? 14 : 12),
+    },
+    addressText: {
+      fontSize: fs(isTablet ? 16 : 14),
+    },
+    orderTotal: {
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    emptyIconSize: isTablet ? 80 : 64,
+    emptyText: {
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    locationIconSize: isTablet ? 20 : 16,
+    chevronSize: isTablet ? 24 : 20,
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
@@ -91,62 +139,67 @@ export default function DashboardScreen() {
   return (
     <ScrollView
       style={styles.container}
+      contentContainerStyle={isTablet ? styles.tabletContent : undefined}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      <View style={styles.header}>
-        <Text style={styles.greeting}>Hola, {user?.name}</Text>
-        <Text style={styles.subtitle}>Gestiona tus entregas</Text>
+      <View style={[styles.header, dynamicStyles.header]}>
+        <Text style={[styles.greeting, dynamicStyles.greeting]}>
+          Hola, {user?.name}
+        </Text>
+        <Text style={[styles.subtitle, dynamicStyles.subtitle]}>
+          Gestiona tus entregas
+        </Text>
       </View>
 
       {/* Estadísticas */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.total}</Text>
-          <Text style={styles.statLabel}>Total</Text>
+      <View style={[styles.statsContainer, dynamicStyles.statsContainer]}>
+        <View style={[styles.statCard, dynamicStyles.statCard]}>
+          <Text style={[styles.statNumber, dynamicStyles.statNumber]}>{stats.total}</Text>
+          <Text style={[styles.statLabel, dynamicStyles.statLabel]}>Total</Text>
         </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: '#FFA500' }]}>
+        <View style={[styles.statCard, dynamicStyles.statCard]}>
+          <Text style={[styles.statNumber, dynamicStyles.statNumber, { color: Colors.warning }]}>
             {stats.assigned}
           </Text>
-          <Text style={styles.statLabel}>Asignados</Text>
+          <Text style={[styles.statLabel, dynamicStyles.statLabel]}>Asignados</Text>
         </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: '#007AFF' }]}>
+        <View style={[styles.statCard, dynamicStyles.statCard]}>
+          <Text style={[styles.statNumber, dynamicStyles.statNumber, { color: Colors.primary }]}>
             {stats.inTransit}
           </Text>
-          <Text style={styles.statLabel}>En Tránsito</Text>
+          <Text style={[styles.statLabel, dynamicStyles.statLabel]}>En Tránsito</Text>
         </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: '#34C759' }]}>
+        <View style={[styles.statCard, dynamicStyles.statCard]}>
+          <Text style={[styles.statNumber, dynamicStyles.statNumber, { color: Colors.success }]}>
             {stats.delivered}
           </Text>
-          <Text style={styles.statLabel}>Entregados</Text>
+          <Text style={[styles.statLabel, dynamicStyles.statLabel]}>Entregados</Text>
         </View>
       </View>
 
       {/* Pedidos Recientes */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Pedidos Recientes</Text>
+      <View style={[styles.section, dynamicStyles.section]}>
+        <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>Pedidos Recientes</Text>
         {assignments.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="document-text-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>No tienes pedidos asignados</Text>
+            <Ionicons name="document-text-outline" size={dynamicStyles.emptyIconSize} color={Colors.textLight} />
+            <Text style={[styles.emptyText, dynamicStyles.emptyText]}>No tienes pedidos asignados</Text>
           </View>
         ) : (
           assignments.slice(0, 5).map((assignment) => (
             <TouchableOpacity
               key={assignment.id}
-              style={styles.orderCard}
+              style={[styles.orderCard, dynamicStyles.orderCard]}
               onPress={() => router.push(`/orders/${assignment.id}`)}
             >
               <View style={styles.orderHeader}>
                 <View>
-                  <Text style={styles.orderNumber}>
+                  <Text style={[styles.orderNumber, dynamicStyles.orderNumber]}>
                     Pedido #{assignment.order?.order_number || 'N/A'}
                   </Text>
-                  <Text style={styles.orderDate}>
+                  <Text style={[styles.orderDate, dynamicStyles.orderDate]}>
                     {new Date(assignment.assigned_at).toLocaleDateString('es-ES', {
                       day: 'numeric',
                       month: 'short',
@@ -158,12 +211,14 @@ export default function DashboardScreen() {
                 <View
                   style={[
                     styles.statusBadge,
+                    dynamicStyles.statusBadge,
                     { backgroundColor: getStatusColor(assignment.status) + '20' },
                   ]}
                 >
                   <Text
                     style={[
                       styles.statusText,
+                      dynamicStyles.statusText,
                       { color: getStatusColor(assignment.status) },
                     ]}
                   >
@@ -173,14 +228,14 @@ export default function DashboardScreen() {
               </View>
               {assignment.order?.delivery_address && (
                 <View style={styles.orderAddress}>
-                  <Ionicons name="location-outline" size={16} color="#666" />
-                  <Text style={styles.addressText} numberOfLines={1}>
+                  <Ionicons name="location-outline" size={dynamicStyles.locationIconSize} color={Colors.textSecondary} />
+                  <Text style={[styles.addressText, dynamicStyles.addressText]} numberOfLines={1}>
                     {assignment.order.delivery_address}
                   </Text>
                 </View>
               )}
               {assignment.order?.total && (
-                <Text style={styles.orderTotal}>
+                <Text style={[styles.orderTotal, dynamicStyles.orderTotal]}>
                   Total: S/. {assignment.order.total.toFixed(2)}
                 </Text>
               )}
@@ -195,7 +250,7 @@ export default function DashboardScreen() {
           onPress={() => router.push('/(tabs)/orders')}
         >
           <Text style={styles.viewAllText}>Ver todos los pedidos</Text>
-          <Ionicons name="chevron-forward" size={20} color="#007AFF" />
+          <Ionicons name="chevron-forward" size={dynamicStyles.chevronSize} color={Colors.primary} />
         </TouchableOpacity>
       )}
     </ScrollView>
@@ -205,7 +260,12 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: Colors.background,
+  },
+  tabletContent: {
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
   },
   loadingContainer: {
     flex: 1,
@@ -213,74 +273,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.backgroundCard,
     borderBottomWidth: 1,
-    borderBottomColor: '#e1e5e9',
+    borderBottomColor: Colors.border,
+    ...Shadows.sm,
   },
   greeting: {
-    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: Colors.text,
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
+    color: Colors.textSecondary,
   },
   statsContainer: {
     flexDirection: 'row',
-    padding: 16,
-    gap: 12,
   },
   statCard: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e1e5e9',
+    borderColor: Colors.border,
+    ...Shadows.sm,
   },
   statNumber: {
-    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: Colors.text,
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#666',
+    color: Colors.textSecondary,
   },
-  section: {
-    padding: 16,
-  },
+  section: {},
   sectionTitle: {
-    fontSize: 18,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
+    color: Colors.text,
   },
   emptyContainer: {
     alignItems: 'center',
     padding: 40,
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#e1e5e9',
+    borderColor: Colors.border,
   },
   emptyText: {
     marginTop: 16,
-    fontSize: 16,
-    color: '#999',
+    color: Colors.textLight,
   },
   orderCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#e1e5e9',
+    borderColor: Colors.border,
+    ...Shadows.sm,
   },
   orderHeader: {
     flexDirection: 'row',
@@ -289,22 +336,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   orderNumber: {
-    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: Colors.text,
     marginBottom: 4,
   },
   orderDate: {
-    fontSize: 12,
-    color: '#666',
+    color: Colors.textSecondary,
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: BorderRadius.md,
   },
   statusText: {
-    fontSize: 12,
     fontWeight: '600',
   },
   orderAddress: {
@@ -313,15 +355,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   addressText: {
-    fontSize: 14,
-    color: '#666',
+    color: Colors.textSecondary,
     marginLeft: 8,
     flex: 1,
   },
   orderTotal: {
-    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: Colors.text,
   },
   viewAllButton: {
     flexDirection: 'row',
@@ -333,11 +373,8 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: Colors.primary,
     fontWeight: '600',
     marginRight: 4,
   },
 });
-
-
-

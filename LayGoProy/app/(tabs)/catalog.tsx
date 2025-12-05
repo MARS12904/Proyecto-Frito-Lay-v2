@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     FlatList,
     Image,
     Modal,
+    RefreshControl,
     StyleSheet,
     Text,
     TextInput,
@@ -16,39 +18,83 @@ import ProductImage from '../../components/ProductImage';
 import { BorderRadius, Colors, Dimensions, FontSizes, Shadows, Spacing } from '../../constants/theme';
 import { useCart } from '../../contexts/CartContext';
 import { useStock } from '../../contexts/StockContext';
-import { getProductsByCategory, Product, productCategories, products, searchProducts } from '../../data/products';
+import { getProductsByCategory, Product, productCategories, products as localProducts, searchProducts } from '../../data/products';
+import { productsService } from '../../services/productsService';
 
 export default function CatalogScreen() {
   return <CatalogContent />;
 }
 
 function CatalogContent() {
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(products);
+  const [allProducts, setAllProducts] = useState<Product[]>(localProducts);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>(localProducts);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   
   const { addToCart, isInCart, isWholesaleMode, updateQuantity } = useCart();
   const { getProductStock, isProductAvailable, reduceStock } = useStock();
 
+  // Cargar productos desde Supabase
+  const loadProducts = useCallback(async () => {
+    try {
+      const supabaseProducts = await productsService.getAllProducts();
+      
+      if (supabaseProducts.length > 0) {
+        // Usar SOLO productos de Supabase si hay conexión
+        // Esto evita duplicados ya que los productos locales son solo un fallback
+        setAllProducts(supabaseProducts);
+        console.log(`📦 Productos cargados: ${supabaseProducts.length} desde Supabase`);
+      } else {
+        // Si no hay productos en Supabase, usar solo locales como fallback
+        setAllProducts(localProducts);
+        console.log(`📦 Usando ${localProducts.length} productos locales (fallback)`);
+      }
+    } catch (error) {
+      console.error('Error cargando productos:', error);
+      setAllProducts(localProducts);
+    }
+  }, []);
+
+  // Cargar productos al iniciar
   useEffect(() => {
-    let filtered = products;
+    setIsLoading(true);
+    loadProducts().finally(() => setIsLoading(false));
+  }, [loadProducts]);
+
+  // Pull to refresh
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadProducts();
+    setRefreshing(false);
+  }, [loadProducts]);
+
+  // Filtrar productos
+  useEffect(() => {
+    let filtered = allProducts;
 
     if (selectedCategory !== 'Todos') {
       const categoryData = productCategories.find(cat => cat.name === selectedCategory);
       if (categoryData) {
-        filtered = getProductsByCategory(categoryData.id);
+        filtered = filtered.filter(p => p.category === categoryData.id);
       }
     }
 
     if (searchQuery) {
-      filtered = searchProducts(searchQuery);
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(p => 
+        p.name.toLowerCase().includes(query) ||
+        p.brand.toLowerCase().includes(query) ||
+        p.description?.toLowerCase().includes(query)
+      );
     }
 
     setFilteredProducts(filtered);
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, allProducts]);
 
   const handleAddToCart = async (product: Product) => {
     if (!product.isAvailable) {
@@ -56,13 +102,15 @@ function CatalogContent() {
       return;
     }
 
+    const productStock = getProductStockValue(product);
+
     if (isWholesaleMode) {
       setSelectedProduct(product);
       setQuantity(product.minOrderQuantity || 12);
       setShowQuantityModal(true);
     } else {
       const desiredQty = 1;
-      if (!isProductAvailable(product.id, desiredQty)) {
+      if (productStock < desiredQty) {
         Alert.alert('Stock insuficiente', 'No hay stock suficiente para agregar este producto.');
         return;
       }
@@ -74,8 +122,35 @@ function CatalogContent() {
 
   const handleConfirmAddToCart = async () => {
     if (selectedProduct) {
-      if (!isProductAvailable(selectedProduct.id, quantity)) {
-        Alert.alert('Stock insuficiente', 'No hay stock suficiente para la cantidad seleccionada.');
+      const minQty = selectedProduct.minOrderQuantity || 12;
+      
+      // Validar que haya una cantidad válida
+      if (quantity <= 0) {
+        Alert.alert('Cantidad inválida', 'Por favor ingresa una cantidad válida.');
+        return;
+      }
+      
+      // Validar cantidad mínima
+      if (quantity < minQty) {
+        Alert.alert(
+          'Cantidad mínima requerida',
+          `Para pedidos mayoristas, el mínimo es ${minQty} unidades. ¿Deseas ajustar la cantidad?`,
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { 
+              text: `Usar ${minQty} unidades`, 
+              onPress: () => {
+                setQuantity(minQty);
+              }
+            }
+          ]
+        );
+        return;
+      }
+      
+      const productStock = getProductStockValue(selectedProduct);
+      if (productStock < quantity) {
+        Alert.alert('Stock insuficiente', `Solo hay ${productStock} unidades disponibles.`);
         return;
       }
       // Ya no reducimos el stock aquí, solo se reduce al procesar el pago
@@ -87,29 +162,50 @@ function CatalogContent() {
     }
   };
 
-  const handleQuantityChange = (newQuantity: number) => {
-    if (selectedProduct) {
-      // Validar mínimo de 12 productos
-      const minQty = selectedProduct.minOrderQuantity || 12;
-      const finalQuantity = Math.max(minQty, newQuantity);
-      setQuantity(finalQuantity);
-    }
+  const handleQuantityChange = (delta: number) => {
+    // Permitir cambiar libremente, mínimo 1 unidad
+    const newQuantity = Math.max(1, quantity + delta);
+    setQuantity(newQuantity);
   };
 
   const handleQuantityTextChange = (text: string) => {
-    const num = parseInt(text, 10);
-    if (!isNaN(num) && num >= 1) {
-      setQuantity(num);
-    } else if (text === '') {
-      // Al borrar, mostrar vacío temporalmente, se validará al confirmar
-      setQuantity(selectedProduct?.minOrderQuantity || 12);
+    // Permitir escribir cualquier número libremente
+    // Solo aceptar dígitos
+    const cleanText = text.replace(/[^0-9]/g, '');
+    
+    if (cleanText === '') {
+      // Permitir campo vacío mientras escribe, se validará al confirmar
+      setQuantity(0);
+      return;
     }
+    
+    const num = parseInt(cleanText, 10);
+    if (!isNaN(num)) {
+      setQuantity(num);
+    }
+  };
+  
+  // Verificar si la cantidad actual es menor al mínimo
+  const isQuantityBelowMinimum = selectedProduct 
+    ? quantity < (selectedProduct.minOrderQuantity || 12) 
+    : false;
+
+  // Función para obtener stock de un producto (Supabase o local)
+  const getProductStockValue = (product: Product): number => {
+    // Si es un UUID (producto de Supabase), usar el stock del propio producto
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id);
+    if (isUUID) {
+      return product.stock;
+    }
+    // Para productos locales, usar el contexto de stock
+    return getProductStock(product.id);
   };
 
   const renderProduct = ({ item }: { item: Product }) => {
     const currentPrice = isWholesaleMode ? item.wholesalePrice : item.price;
     const savings = item.price - item.wholesalePrice;
     const isInCartItem = isInCart(item.id);
+    const productStock = getProductStockValue(item);
 
     return (
       <ResponsiveCard style={styles.productCard} padding="md">
@@ -120,7 +216,7 @@ function CatalogContent() {
             fallbackIcon="bag-outline"
             fallbackColor={Colors.light.primary}
           />
-          {getProductStock(item.id) === 0 && (
+          {productStock === 0 && (
             <View style={styles.unavailableOverlay}>
               <Text style={styles.unavailableText}>Agotado</Text>
             </View>
@@ -162,7 +258,7 @@ function CatalogContent() {
               )}
             </View>
             <Text style={styles.productStock}>
-              Stock: {getProductStock(item.id)}
+              Stock: {productStock}
             </Text>
           </View>
 
@@ -170,10 +266,10 @@ function CatalogContent() {
           <TouchableOpacity
             style={[
               styles.addButton,
-              (!item.isAvailable || isInCartItem || getProductStock(item.id) === 0) && styles.addButtonDisabled
+              (!item.isAvailable || isInCartItem || productStock === 0) && styles.addButtonDisabled
             ]}
             onPress={() => handleAddToCart(item)}
-            disabled={!item.isAvailable || isInCartItem || getProductStock(item.id) === 0}
+            disabled={!item.isAvailable || isInCartItem || productStock === 0}
           >
             <Ionicons 
               name={isInCartItem ? "checkmark" : "add"} 
@@ -234,15 +330,37 @@ function CatalogContent() {
         />
       </View>
 
-      <FlatList
-        data={filteredProducts}
-        renderItem={renderProduct}
-        keyExtractor={(item) => item.id}
-        numColumns={Dimensions.isSmallScreen ? 1 : 2}
-        contentContainerStyle={styles.productsList}
-        showsVerticalScrollIndicator={false}
-        columnWrapperStyle={Dimensions.isSmallScreen ? undefined : styles.row}
-      />
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.light.primary} />
+          <Text style={styles.loadingText}>Cargando productos...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredProducts}
+          renderItem={renderProduct}
+          keyExtractor={(item) => item.id}
+          numColumns={Dimensions.isSmallScreen ? 1 : 2}
+          contentContainerStyle={styles.productsList}
+          showsVerticalScrollIndicator={false}
+          columnWrapperStyle={Dimensions.isSmallScreen ? undefined : styles.row}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[Colors.light.primary]}
+              tintColor={Colors.light.primary}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="cube-outline" size={64} color={Colors.light.textLight} />
+              <Text style={styles.emptyText}>No hay productos disponibles</Text>
+              <Text style={styles.emptySubtext}>Desliza hacia abajo para refrescar</Text>
+            </View>
+          }
+        />
+      )}
 
       {/* Modal para seleccionar cantidad */}
       <Modal
@@ -261,31 +379,45 @@ function CatalogContent() {
             
             <View style={styles.quantityContainer}>
               <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={() => handleQuantityChange(quantity - 1)}
-                disabled={quantity <= (selectedProduct?.minOrderQuantity || 12)}
+                style={[styles.quantityButton, quantity <= 1 && styles.quantityButtonDisabled]}
+                onPress={() => handleQuantityChange(-1)}
+                disabled={quantity <= 1}
               >
-                <Ionicons name="remove" size={20} color={Colors.light.primary} />
+                <Ionicons 
+                  name="remove" 
+                  size={20} 
+                  color={quantity <= 1 ? Colors.light.textLight : Colors.light.primary} 
+                />
               </TouchableOpacity>
               
               <TextInput
-                style={styles.quantityInput}
-                value={String(quantity)}
+                style={[
+                  styles.quantityInput,
+                  isQuantityBelowMinimum && styles.quantityInputWarning
+                ]}
+                value={quantity === 0 ? '' : String(quantity)}
                 onChangeText={handleQuantityTextChange}
                 keyboardType="number-pad"
+                placeholder="0"
                 selectTextOnFocus
               />
               
               <TouchableOpacity
                 style={styles.quantityButton}
-                onPress={() => handleQuantityChange(quantity + 1)}
+                onPress={() => handleQuantityChange(1)}
               >
                 <Ionicons name="add" size={20} color={Colors.light.primary} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.minOrderHint}>
-              Mínimo: {selectedProduct?.minOrderQuantity || 12} unidades
+            <Text style={[
+              styles.minOrderHint,
+              isQuantityBelowMinimum && styles.minOrderHintWarning
+            ]}>
+              {isQuantityBelowMinimum 
+                ? `⚠️ Mínimo requerido: ${selectedProduct?.minOrderQuantity || 12} unidades`
+                : `Mínimo: ${selectedProduct?.minOrderQuantity || 12} unidades`
+              }
             </Text>
 
             <Text style={styles.totalText}>
@@ -597,9 +729,20 @@ const styles = StyleSheet.create({
   },
   minOrderHint: {
     fontSize: FontSizes.sm,
-    color: Colors.light.warning,
+    color: Colors.light.textSecondary,
     textAlign: 'center',
     marginBottom: Spacing.md,
+  },
+  minOrderHintWarning: {
+    color: Colors.light.error,
+    fontWeight: '600',
+  },
+  quantityInputWarning: {
+    borderColor: Colors.light.error,
+    borderWidth: 2,
+  },
+  quantityButtonDisabled: {
+    opacity: 0.5,
   },
   totalText: {
     fontSize: FontSizes.lg,
@@ -633,5 +776,33 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     color: Colors.light.background,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: Spacing.xl * 2,
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: FontSizes.md,
+    color: Colors.light.textSecondary,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: Spacing.xl * 2,
+  },
+  emptyText: {
+    marginTop: Spacing.md,
+    fontSize: FontSizes.lg,
+    fontWeight: '600',
+    color: Colors.light.textSecondary,
+  },
+  emptySubtext: {
+    marginTop: Spacing.xs,
+    fontSize: FontSizes.sm,
+    color: Colors.light.textLight,
   },
 });

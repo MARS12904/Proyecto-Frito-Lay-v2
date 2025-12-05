@@ -10,9 +10,12 @@ import {
   View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
+import { useResponsive } from '../../hooks/useResponsive';
+import { Colors, BorderRadius, Shadows } from '../../constants/theme';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
+  const { fs, sp, wp, isTablet, isSmallPhone } = useResponsive();
 
   const handleLogout = () => {
     Alert.alert(
@@ -32,55 +35,113 @@ export default function ProfileScreen() {
     );
   };
 
+  // Estilos dinámicos responsive
+  const dynamicStyles = {
+    contentContainer: {
+      maxWidth: isTablet ? 600 : undefined,
+      alignSelf: isTablet ? 'center' as const : undefined,
+      width: isTablet ? '100%' : undefined,
+    },
+    header: {
+      padding: sp(isTablet ? 40 : 32),
+    },
+    avatarContainer: {
+      width: sp(isTablet ? 120 : 100),
+      height: sp(isTablet ? 120 : 100),
+      borderRadius: sp(isTablet ? 60 : 50),
+    },
+    avatarIconSize: isTablet ? 56 : 48,
+    name: {
+      fontSize: fs(isTablet ? 28 : 24),
+    },
+    email: {
+      fontSize: fs(isTablet ? 16 : 14),
+    },
+    section: {
+      marginTop: sp(isTablet ? 20 : 16),
+      paddingVertical: sp(isTablet ? 12 : 8),
+    },
+    sectionTitle: {
+      fontSize: fs(isTablet ? 20 : 18),
+      paddingHorizontal: sp(isTablet ? 20 : 16),
+      paddingVertical: sp(isTablet ? 16 : 12),
+    },
+    infoRow: {
+      padding: sp(isTablet ? 20 : 16),
+    },
+    infoIconSize: isTablet ? 24 : 20,
+    infoContent: {
+      marginLeft: sp(isTablet ? 20 : 16),
+    },
+    infoLabel: {
+      fontSize: fs(isTablet ? 14 : 12),
+    },
+    infoValue: {
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    menuItem: {
+      padding: sp(isTablet ? 20 : 16),
+    },
+    menuIconSize: isTablet ? 28 : 24,
+    menuText: {
+      fontSize: fs(isTablet ? 18 : 16),
+      marginLeft: sp(isTablet ? 20 : 16),
+    },
+    chevronSize: isTablet ? 24 : 20,
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.avatarContainer}>
-          <Ionicons name="person" size={48} color="#007AFF" />
+    <ScrollView 
+      style={styles.container}
+      contentContainerStyle={dynamicStyles.contentContainer}
+    >
+      <View style={[styles.header, dynamicStyles.header]}>
+        <View style={[styles.avatarContainer, dynamicStyles.avatarContainer]}>
+          <Ionicons name="person" size={dynamicStyles.avatarIconSize} color={Colors.primary} />
         </View>
-        <Text style={styles.name}>{user?.name || 'Repartidor'}</Text>
-        <Text style={styles.email}>{user?.email}</Text>
+        <Text style={[styles.name, dynamicStyles.name]}>{user?.name || 'Repartidor'}</Text>
+        <Text style={[styles.email, dynamicStyles.email]}>{user?.email}</Text>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Información Personal</Text>
+      <View style={[styles.section, dynamicStyles.section]}>
+        <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>Información Personal</Text>
         
-        <View style={styles.infoRow}>
-          <Ionicons name="mail-outline" size={20} color="#666" />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Correo</Text>
-            <Text style={styles.infoValue}>{user?.email}</Text>
+        <View style={[styles.infoRow, dynamicStyles.infoRow]}>
+          <Ionicons name="mail-outline" size={dynamicStyles.infoIconSize} color={Colors.textSecondary} />
+          <View style={[styles.infoContent, dynamicStyles.infoContent]}>
+            <Text style={[styles.infoLabel, dynamicStyles.infoLabel]}>Correo</Text>
+            <Text style={[styles.infoValue, dynamicStyles.infoValue]}>{user?.email}</Text>
           </View>
         </View>
 
         {user?.phone && (
-          <View style={styles.infoRow}>
-            <Ionicons name="call-outline" size={20} color="#666" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Teléfono</Text>
-              <Text style={styles.infoValue}>{user.phone}</Text>
+          <View style={[styles.infoRow, dynamicStyles.infoRow]}>
+            <Ionicons name="call-outline" size={dynamicStyles.infoIconSize} color={Colors.textSecondary} />
+            <View style={[styles.infoContent, dynamicStyles.infoContent]}>
+              <Text style={[styles.infoLabel, dynamicStyles.infoLabel]}>Teléfono</Text>
+              <Text style={[styles.infoValue, dynamicStyles.infoValue]}>{user.phone}</Text>
             </View>
           </View>
         )}
 
         {user?.license_number && (
-          <View style={styles.infoRow}>
-            <Ionicons name="card-outline" size={20} color="#666" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Licencia</Text>
-              <Text style={styles.infoValue}>{user.license_number}</Text>
+          <View style={[styles.infoRow, dynamicStyles.infoRow]}>
+            <Ionicons name="card-outline" size={dynamicStyles.infoIconSize} color={Colors.textSecondary} />
+            <View style={[styles.infoContent, dynamicStyles.infoContent]}>
+              <Text style={[styles.infoLabel, dynamicStyles.infoLabel]}>Licencia</Text>
+              <Text style={[styles.infoValue, dynamicStyles.infoValue]}>{user.license_number}</Text>
             </View>
           </View>
         )}
       </View>
 
-      <View style={styles.section}>
-        <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
-          <Text style={[styles.menuText, { color: '#FF3B30' }]}>
+      <View style={[styles.section, dynamicStyles.section]}>
+        <TouchableOpacity style={[styles.menuItem, dynamicStyles.menuItem]} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={dynamicStyles.menuIconSize} color={Colors.error} />
+          <Text style={[styles.menuText, dynamicStyles.menuText, { color: Colors.error }]}>
             Cerrar Sesión
           </Text>
-          <Ionicons name="chevron-forward" size={20} color="#ccc" />
+          <Ionicons name="chevron-forward" size={dynamicStyles.chevronSize} color={Colors.textLight} />
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -90,82 +151,63 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: Colors.background,
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.backgroundCard,
     alignItems: 'center',
-    padding: 32,
     borderBottomWidth: 1,
-    borderBottomColor: '#e1e5e9',
+    borderBottomColor: Colors.border,
+    ...Shadows.sm,
   },
   avatarContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#E6F4FE',
+    backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    ...Shadows.md,
   },
   name: {
-    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: Colors.text,
     marginBottom: 4,
   },
   email: {
-    fontSize: 14,
-    color: '#666',
+    color: Colors.textSecondary,
   },
   section: {
-    backgroundColor: '#fff',
-    marginTop: 16,
-    paddingVertical: 8,
+    backgroundColor: Colors.backgroundCard,
   },
   sectionTitle: {
-    fontSize: 18,
     fontWeight: '600',
-    color: '#333',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    color: Colors.text,
     borderBottomWidth: 1,
-    borderBottomColor: '#e1e5e9',
+    borderBottomColor: Colors.border,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: Colors.borderLight,
   },
   infoContent: {
-    marginLeft: 16,
     flex: 1,
   },
   infoLabel: {
-    fontSize: 12,
-    color: '#666',
+    color: Colors.textSecondary,
     marginBottom: 4,
   },
   infoValue: {
-    fontSize: 16,
-    color: '#333',
+    color: Colors.text,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: Colors.borderLight,
   },
   menuText: {
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 16,
+    color: Colors.text,
     flex: 1,
   },
 });
-
-
-

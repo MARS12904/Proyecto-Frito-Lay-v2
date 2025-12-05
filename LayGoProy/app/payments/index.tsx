@@ -254,6 +254,7 @@ function PaymentsContent() {
         items: orderItems,
         deliveryDate: deliverySchedule?.date,
         deliveryAddress: deliverySchedule?.address,
+        deliveryAddressId: deliverySchedule?.addressId, // ID de la dirección para relación directa
         deliveryTimeSlot: deliverySchedule?.timeSlot,
         paymentMethod: paymentMethodName,
         isWholesale: isWholesaleMode,

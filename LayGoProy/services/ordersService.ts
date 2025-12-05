@@ -338,6 +338,8 @@ export const ordersService = {
             status: 'pending',
             payment_status: 'pending',
             delivery_status: 'pending',
+            delivery_address: orderData.deliveryAddress || null,
+            delivery_address_id: orderData.deliveryAddressId || null, // Nueva relación directa
             delivery_date: orderData.deliveryDate,
             delivery_time_slot: orderData.deliveryTimeSlot,
             payment_method: orderData.paymentMethod,

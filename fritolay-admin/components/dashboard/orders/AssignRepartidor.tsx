@@ -43,19 +43,29 @@ export default function AssignRepartidor({
   const loadRepartidores = async () => {
     try {
       setLoadingRepartidores(true)
-      const response = await fetch('/api/repartidores')
+      // Agregar timestamp para evitar caché del navegador
+      const response = await fetch(`/api/repartidores?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        }
+      })
       const data = await response.json()
 
       if (response.ok && Array.isArray(data)) {
-        setRepartidores(data.filter((r: any) => r.is_active))
+        // Filtrar repartidores activos (is_active = true o null/undefined se considera activo)
+        const activeRepartidores = data.filter((r: any) => r.is_active !== false)
+        console.log('🚚 Repartidores cargados:', activeRepartidores.length, 'de', data.length, activeRepartidores.map((r: any) => r.name))
+        setRepartidores(activeRepartidores)
         if (currentRepartidor) {
           setSelectedRepartidorId(currentRepartidor.id)
         }
       } else {
+        console.error('❌ Error loading repartidores:', data)
         setError('Error al cargar repartidores')
       }
     } catch (err) {
-      console.error('Error loading repartidores:', err)
+      console.error('❌ Error loading repartidores:', err)
       setError('Error al cargar repartidores')
     } finally {
       setLoadingRepartidores(false)

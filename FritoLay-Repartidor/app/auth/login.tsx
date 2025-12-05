@@ -13,6 +13,8 @@ import {
     View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
+import { useResponsive } from '../../hooks/useResponsive';
+import { Colors, BorderRadius, Shadows } from '../../constants/theme';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -21,6 +23,7 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   
   const { login } = useAuth();
+  const { fs, sp, wp, isTablet, isSmallPhone } = useResponsive();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -47,27 +50,79 @@ export default function LoginScreen() {
     }
   };
 
+  // Estilos dinámicos responsive
+  const dynamicStyles = {
+    scrollContainer: {
+      padding: sp(isTablet ? 40 : 20),
+      maxWidth: isTablet ? 500 : undefined,
+      alignSelf: isTablet ? 'center' as const : undefined,
+      width: isTablet ? '100%' : undefined,
+    },
+    logoContainer: {
+      width: sp(isTablet ? 140 : isSmallPhone ? 100 : 120),
+      height: sp(isTablet ? 140 : isSmallPhone ? 100 : 120),
+      borderRadius: sp(isTablet ? 70 : isSmallPhone ? 50 : 60),
+    },
+    title: {
+      fontSize: fs(isTablet ? 36 : 32),
+    },
+    subtitle: {
+      fontSize: fs(isTablet ? 24 : 20),
+    },
+    description: {
+      fontSize: fs(isSmallPhone ? 13 : 14),
+    },
+    inputContainer: {
+      paddingHorizontal: sp(isTablet ? 20 : 16),
+      marginBottom: sp(isTablet ? 20 : 16),
+    },
+    input: {
+      height: sp(isTablet ? 56 : 50),
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    loginButton: {
+      height: sp(isTablet ? 56 : 50),
+      marginTop: sp(isTablet ? 12 : 8),
+    },
+    loginButtonText: {
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    iconSize: isTablet ? 24 : 20,
+    logoIconSize: isTablet ? 72 : isSmallPhone ? 48 : 64,
+  };
+
   return (
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView 
+        contentContainerStyle={[styles.scrollContainer, dynamicStyles.scrollContainer]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="bicycle" size={64} color="#007AFF" />
+          <View style={[styles.logoContainer, dynamicStyles.logoContainer]}>
+            <Ionicons name="bicycle" size={dynamicStyles.logoIconSize} color={Colors.primary} />
           </View>
-          <Text style={styles.title}>Frito Lay</Text>
-          <Text style={styles.subtitle}>Repartidor</Text>
-          <Text style={styles.description}>Inicia sesión para gestionar tus entregas</Text>
+          <Text style={[styles.title, dynamicStyles.title]}>Frito Lay</Text>
+          <Text style={[styles.subtitle, dynamicStyles.subtitle]}>Repartidor</Text>
+          <Text style={[styles.description, dynamicStyles.description]}>
+            Inicia sesión para gestionar tus entregas
+          </Text>
         </View>
 
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
+        <View style={[styles.form, { width: '100%' }]}>
+          <View style={[styles.inputContainer, dynamicStyles.inputContainer]}>
+            <Ionicons 
+              name="mail-outline" 
+              size={dynamicStyles.iconSize} 
+              color={Colors.textSecondary} 
+              style={styles.inputIcon} 
+            />
             <TextInput
-              style={styles.input}
+              style={[styles.input, dynamicStyles.input]}
               placeholder="Correo electrónico"
+              placeholderTextColor={Colors.textLight}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -77,11 +132,17 @@ export default function LoginScreen() {
             />
           </View>
 
-          <View style={styles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
+          <View style={[styles.inputContainer, dynamicStyles.inputContainer]}>
+            <Ionicons 
+              name="lock-closed-outline" 
+              size={dynamicStyles.iconSize} 
+              color={Colors.textSecondary} 
+              style={styles.inputIcon} 
+            />
             <TextInput
-              style={styles.input}
+              style={[styles.input, dynamicStyles.input]}
               placeholder="Contraseña"
+              placeholderTextColor={Colors.textLight}
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
@@ -93,18 +154,22 @@ export default function LoginScreen() {
             >
               <Ionicons 
                 name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                size={20} 
-                color="#666" 
+                size={dynamicStyles.iconSize} 
+                color={Colors.textSecondary} 
               />
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity
-            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+            style={[
+              styles.loginButton, 
+              dynamicStyles.loginButton,
+              isLoading && styles.loginButtonDisabled
+            ]}
             onPress={handleLogin}
             disabled={isLoading}
           >
-            <Text style={styles.loginButtonText}>
+            <Text style={[styles.loginButtonText, dynamicStyles.loginButtonText]}>
               {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Text>
           </TouchableOpacity>
@@ -117,41 +182,35 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: Colors.background,
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 20,
   },
   header: {
     alignItems: 'center',
     marginBottom: 40,
   },
   logoContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#E6F4FE',
+    backgroundColor: Colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
+    ...Shadows.md,
   },
   title: {
-    fontSize: 32,
     fontWeight: 'bold',
-    color: '#333',
+    color: Colors.text,
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 20,
-    color: '#007AFF',
+    color: Colors.primary,
     fontWeight: '600',
     marginBottom: 8,
   },
   description: {
-    fontSize: 14,
-    color: '#666',
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
   form: {
@@ -160,42 +219,34 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 16,
+    backgroundColor: Colors.backgroundCard,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#e1e5e9',
+    borderColor: Colors.border,
+    ...Shadows.sm,
   },
   inputIcon: {
     marginRight: 12,
   },
   input: {
     flex: 1,
-    height: 50,
-    fontSize: 16,
-    color: '#333',
+    color: Colors.text,
   },
   eyeIcon: {
     padding: 8,
   },
   loginButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    height: 50,
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    ...Shadows.md,
   },
   loginButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: Colors.textLight,
   },
   loginButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: Colors.white,
     fontWeight: '600',
   },
 });
-
-
-

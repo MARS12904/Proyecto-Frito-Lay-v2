@@ -9,6 +9,31 @@ interface EmailOptions {
 }
 
 /**
+ * Parsea una fecha YYYY-MM-DD sin problemas de zona horaria
+ */
+function parseLocalDate(dateStr: string): Date {
+  // Si ya es un formato con hora, usar Date directamente
+  if (dateStr.includes('T') || dateStr.includes(' ')) {
+    return new Date(dateStr);
+  }
+  // Para formato YYYY-MM-DD, parsear manualmente para evitar problemas de UTC
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/**
+ * Formatea una fecha para mostrar
+ */
+function formatDate(dateStr: string): string {
+  const date = parseLocalDate(dateStr);
+  return date.toLocaleDateString('es-PE', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+}
+
+/**
  * Convierte el estado del pedido a etiqueta en español
  */
 function getStatusLabel(status: Order['status']): string {
@@ -27,11 +52,7 @@ function getStatusLabel(status: Order['status']): string {
  * Genera el contenido HTML del email de confirmación de pedido
  */
 export function generateOrderConfirmationEmail(order: Order, userName: string): string {
-  const orderDate = new Date(order.date).toLocaleDateString('es-PE', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+  const orderDate = formatDate(order.date);
 
   const itemsHtml = order.items.map(item => `
     <tr style="border-bottom: 1px solid #e0e0e0;">
@@ -142,7 +163,7 @@ export function generateOrderConfirmationEmail(order: Order, userName: string): 
                 </p>
                 ${order.deliveryDate ? `
                 <p style="color: #333; margin: 5px 0; font-size: 14px;">
-                  <strong>Fecha de Entrega:</strong> ${order.deliveryDate}
+                  <strong>Fecha de Entrega:</strong> ${formatDate(order.deliveryDate)}
                 </p>
                 ` : ''}
                 ${order.deliveryTimeSlot ? `
@@ -225,11 +246,7 @@ export function generateOrderConfirmationEmail(order: Order, userName: string): 
  * Genera el contenido de texto plano del email
  */
 export function generateOrderConfirmationEmailText(order: Order, userName: string): string {
-  const orderDate = new Date(order.date).toLocaleDateString('es-PE', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+  const orderDate = formatDate(order.date);
 
   let text = `¡Pedido Confirmado!\n\n`;
   text += `Hola ${userName},\n\n`;
@@ -256,7 +273,7 @@ export function generateOrderConfirmationEmailText(order: Order, userName: strin
   if (order.deliveryAddress) {
     text += `Información de Entrega:\n`;
     text += `Dirección: ${order.deliveryAddress}\n`;
-    if (order.deliveryDate) text += `Fecha: ${order.deliveryDate}\n`;
+    if (order.deliveryDate) text += `Fecha: ${formatDate(order.deliveryDate)}\n`;
     if (order.deliveryTimeSlot) text += `Horario: ${order.deliveryTimeSlot}\n`;
     text += `\n`;
   }
@@ -362,7 +379,7 @@ export async function sendOrderConfirmationEmail(
   const subject = `✅ Confirmación de Pedido ${order.id} - Frito-Lay Perú`;
   const html = generateOrderConfirmationEmail(order, userName);
   const text = generateOrderConfirmationEmailText(order, userName);
-  const orderDate = new Date(order.date).toLocaleDateString('es-PE');
+  const orderDate = formatDate(order.date);
 
   const templateParams = {
     order_id: order.id,

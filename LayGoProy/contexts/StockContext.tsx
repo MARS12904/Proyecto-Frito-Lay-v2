@@ -3,6 +3,12 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Product, products } from '../data/products';
 import { productsService } from '../services/productsService';
 
+// Función para validar si un string es un UUID válido
+const isValidUUID = (str: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
+
 interface StockContextType {
   stock: Record<string, number>;
   updateStock: (productId: string, quantity: number) => Promise<void>;
@@ -41,7 +47,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Cargar stock desde Supabase y luego combinar con datos locales
   const loadStock = async () => {
     try {
-      // 1. Primero intentar cargar desde Supabase
+      // 1. Primero intentar cargar desde Supabase (incluye productos con UUID)
       const supabaseStock = await productsService.getAllProductsStock();
       
       // 2. Cargar también el stock guardado localmente como respaldo
@@ -49,7 +55,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const localStock: Record<string, number> = localStockData ? JSON.parse(localStockData) : {};
       
       // 3. Combinar: Supabase tiene prioridad, luego local, luego valores por defecto
-      const combinedStock: Record<string, number> = {};
+      const combinedStock: Record<string, number> = { ...supabaseStock }; // Incluir TODOS los productos de Supabase
       
       products.forEach(product => {
         // Prioridad: Supabase > AsyncStorage > valor por defecto del producto
@@ -67,7 +73,7 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       setStock(combinedStock);
       setIsLoaded(true);
-      console.log('Stock cargado correctamente');
+      console.log(`Stock cargado: ${Object.keys(combinedStock).length} productos`);
     } catch (error) {
       console.error('Error loading stock:', error);
       // En caso de error, usar valores por defecto
@@ -129,7 +135,26 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const reduceStock = async (productId: string, quantity: number): Promise<boolean> => {
-    const currentStock = stock[productId] || 0;
+    let currentStock = stock[productId];
+    
+    // Para productos de Supabase (UUID), consultar stock actual si no está en el estado local
+    if ((currentStock === undefined || currentStock === 0) && isValidUUID(productId)) {
+      try {
+        const supabaseStock = await productsService.getProductStock(productId);
+        if (supabaseStock !== null) {
+          currentStock = supabaseStock;
+          // Actualizar estado local con el valor de Supabase
+          setStock(prev => ({
+            ...prev,
+            [productId]: supabaseStock
+          }));
+        }
+      } catch (error) {
+        console.error('Error consultando stock de Supabase:', error);
+      }
+    }
+    
+    currentStock = currentStock || 0;
     
     if (currentStock < quantity) {
       console.warn(`Stock insuficiente para ${productId}: disponible ${currentStock}, requerido ${quantity}`);
@@ -147,7 +172,6 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Intentar actualizar en Supabase (si el producto existe allí)
     try {
       await productsService.reduceProductStock(productId, quantity);
-      // No mostrar warning si retorna false - simplemente el producto no está en Supabase
     } catch (error) {
       // Ignorar errores de Supabase, el stock local ya se actualizó
     }
@@ -157,7 +181,21 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const increaseStock = async (productId: string, quantity: number): Promise<void> => {
-    const currentStock = stock[productId] || 0;
+    let currentStock = stock[productId];
+    
+    // Para productos de Supabase (UUID), consultar stock actual si no está en el estado local
+    if (currentStock === undefined && isValidUUID(productId)) {
+      try {
+        const supabaseStock = await productsService.getProductStock(productId);
+        if (supabaseStock !== null) {
+          currentStock = supabaseStock;
+        }
+      } catch (error) {
+        console.error('Error consultando stock de Supabase:', error);
+      }
+    }
+    
+    currentStock = currentStock || 0;
     const newStock = currentStock + Math.max(0, quantity);
     
     // Actualizar estado local
@@ -177,12 +215,26 @@ export const StockProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const getProductStock = (productId: string): number => {
-    return stock[productId] || 0;
+    // Si está en el estado local, devolverlo
+    if (stock[productId] !== undefined) {
+      return stock[productId];
+    }
+    // Para productos UUID que no están en el estado, retornar 0
+    // El stock real se cargará cuando se llame a reduceStock
+    return 0;
   };
 
   const isProductAvailable = (productId: string, quantity: number): boolean => {
-    const currentStock = stock[productId] || 0;
-    return currentStock >= quantity;
+    // Si está en el estado local, verificar
+    if (stock[productId] !== undefined) {
+      return stock[productId] >= quantity;
+    }
+    // Para productos de Supabase que no están en el estado local,
+    // asumir disponible (la verificación real se hace en reduceStock)
+    if (isValidUUID(productId)) {
+      return true; // Se verificará al procesar el pago
+    }
+    return false;
   };
 
   const value: StockContextType = {

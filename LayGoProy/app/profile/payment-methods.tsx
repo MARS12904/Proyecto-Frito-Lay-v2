@@ -25,7 +25,6 @@ export default function PaymentMethodsScreen() {
     name: '',
     cardNumber: '',
     expiryDate: '',
-    cvv: '',
     bank: '',
     accountNumber: '',
   });
@@ -79,13 +78,8 @@ export default function PaymentMethodsScreen() {
       return;
     }
 
-    if (formData.type === 'card' && (!formData.cardNumber || !formData.expiryDate || !formData.cvv)) {
-      Alert.alert('Error', 'Completa todos los datos de la tarjeta, incluyendo el CVV');
-      return;
-    }
-    
-    if (formData.type === 'card' && formData.cvv.length < 3) {
-      Alert.alert('Error', 'El CVV debe tener al menos 3 dígitos');
+    if (formData.type === 'card' && (!formData.cardNumber || !formData.expiryDate)) {
+      Alert.alert('Error', 'Completa todos los datos de la tarjeta');
       return;
     }
 
@@ -291,7 +285,6 @@ export default function PaymentMethodsScreen() {
       name: method.name,
       cardNumber: method.details?.cardNumber || '',
       expiryDate: method.details?.expiryDate || '',
-      cvv: '', // CVV no se guarda por seguridad, se solicita en cada compra
       bank: method.details?.bank || '',
       accountNumber: method.details?.accountNumber || '',
     });
@@ -304,7 +297,6 @@ export default function PaymentMethodsScreen() {
       name: '',
       cardNumber: '',
       expiryDate: '',
-      cvv: '',
       bank: '',
       accountNumber: '',
     });
@@ -489,21 +481,6 @@ export default function PaymentMethodsScreen() {
                       keyboardType="numeric"
                       maxLength={5}
                     />
-                  </View>
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>CVV *</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={formData.cvv}
-                      onChangeText={(text) => setFormData({ ...formData, cvv: text })}
-                      placeholder="123"
-                      keyboardType="numeric"
-                      maxLength={4}
-                      secureTextEntry
-                    />
-                    <Text style={styles.inputHint}>
-                      El CVV se solicita para validar la tarjeta. No se guarda por seguridad.
-                    </Text>
                   </View>
                 </>
               )}
@@ -744,12 +721,6 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.md,
     fontWeight: '600',
     color: Colors.light.background,
-  },
-  inputHint: {
-    fontSize: FontSizes.xs,
-    color: Colors.light.textSecondary,
-    marginTop: Spacing.xs,
-    fontStyle: 'italic',
   },
 });
 

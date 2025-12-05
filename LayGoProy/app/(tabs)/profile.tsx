@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useState, useEffect } from 'react';
 import { 
   Alert, 
@@ -10,11 +11,13 @@ import {
   Text, 
   TouchableOpacity, 
   View,
-  Dimensions 
+  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
 import { useMetrics } from '../../contexts/MetricsContext';
+import { userProfileService } from '../../services/userProfileService';
 import { 
   Colors, 
   Spacing, 
@@ -33,6 +36,7 @@ export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     user?.preferences?.notifications ?? true
   );
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // Recargar métricas cuando el usuario cambia o cuando se monta el componente
   useEffect(() => {
@@ -54,7 +58,104 @@ export default function ProfileScreen() {
   };
 
   const handleImagePicker = async () => {
-    Alert.alert('Función en desarrollo', 'La selección de imagen estará disponible pronto');
+    if (!user) return;
+
+    Alert.alert(
+      'Cambiar foto de perfil',
+      'Selecciona una opción',
+      [
+        {
+          text: 'Tomar foto',
+          onPress: async () => {
+            // Solicitar permisos de cámara
+            const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permisos requeridos', 'Se necesitan permisos de cámara para tomar fotos.');
+              return;
+            }
+
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+              await uploadImage(result.assets[0].uri);
+            }
+          },
+        },
+        {
+          text: 'Elegir de galería',
+          onPress: async () => {
+            // Solicitar permisos de galería
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== 'granted') {
+              Alert.alert('Permisos requeridos', 'Se necesitan permisos para acceder a la galería.');
+              return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+              await uploadImage(result.assets[0].uri);
+            }
+          },
+        },
+        ...(user.profileImage ? [{
+          text: 'Eliminar foto',
+          style: 'destructive' as const,
+          onPress: async () => {
+            setIsUploadingImage(true);
+            try {
+              const success = await userProfileService.deleteProfileImage(user.id);
+              if (success) {
+                await updateProfile({ profileImage: undefined });
+                Alert.alert('Éxito', 'Foto de perfil eliminada');
+              } else {
+                Alert.alert('Error', 'No se pudo eliminar la foto');
+              }
+            } catch (error) {
+              console.error('Error deleting image:', error);
+              Alert.alert('Error', 'Ocurrió un error al eliminar la foto');
+            } finally {
+              setIsUploadingImage(false);
+            }
+          },
+        }] : []),
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
+  const uploadImage = async (imageUri: string) => {
+    if (!user) return;
+
+    setIsUploadingImage(true);
+    try {
+      const imageUrl = await userProfileService.uploadProfileImage(user.id, imageUri);
+      
+      if (imageUrl) {
+        await updateProfile({ profileImage: imageUrl });
+        Alert.alert('Éxito', 'Foto de perfil actualizada correctamente');
+      } else {
+        Alert.alert('Error', 'No se pudo subir la imagen. Verifica tu conexión.');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      Alert.alert('Error', 'Ocurrió un error al subir la imagen');
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const handleEditProfile = () => {
@@ -119,14 +220,22 @@ export default function ProfileScreen() {
       {/* Header del perfil */}
       <View style={styles.header}>
         <View style={styles.profileImageContainer}>
-          {user.profileImage ? (
+          {isUploadingImage ? (
+            <View style={[styles.defaultProfileImage, styles.uploadingContainer]}>
+              <ActivityIndicator size="large" color={Colors.light.primary} />
+            </View>
+          ) : user.profileImage ? (
             <Image source={{ uri: user.profileImage }} style={styles.profileImage} />
           ) : (
             <View style={styles.defaultProfileImage}>
               <Ionicons name="business" size={responsive({ xs: 32, sm: 36, md: 40 })} color={Colors.light.primary} />
             </View>
           )}
-          <TouchableOpacity style={styles.editImageButton} onPress={handleImagePicker}>
+          <TouchableOpacity 
+            style={[styles.editImageButton, isUploadingImage && styles.editImageButtonDisabled]} 
+            onPress={handleImagePicker}
+            disabled={isUploadingImage}
+          >
             <Ionicons name="camera" size={responsive({ xs: 12, sm: 14, md: 16 })} color={Colors.light.background} />
           </TouchableOpacity>
         </View>
@@ -449,6 +558,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     ...Shadows.sm,
+  },
+  editImageButtonDisabled: {
+    opacity: 0.5,
+  },
+  uploadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   userInfo: {
     alignItems: 'center',

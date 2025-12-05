@@ -1,9 +1,8 @@
 {
+  "/api/repartidores/register/route": "app/api/repartidores/register/route.js",
   "/api/repartidores/route": "app/api/repartidores/route.js",
-  "/api/orders/assign/route": "app/api/orders/assign/route.js",
-  "/(dashboard)/dashboard/pedidos/page": "app/(dashboard)/dashboard/pedidos/page.js",
+  "/api/orders/route": "app/api/orders/route.js",
   "/(dashboard)/dashboard/pedidos/[id]/page": "app/(dashboard)/dashboard/pedidos/[id]/page.js",
-  "/(dashboard)/dashboard/reportes/page": "app/(dashboard)/dashboard/reportes/page.js",
-  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
-  "/(dashboard)/dashboard/usuarios/page": "app/(dashboard)/dashboard/usuarios/page.js"
+  "/(dashboard)/dashboard/repartidores/page": "app/(dashboard)/dashboard/repartidores/page.js",
+  "/(dashboard)/dashboard/pedidos/page": "app/(dashboard)/dashboard/pedidos/page.js"
 }

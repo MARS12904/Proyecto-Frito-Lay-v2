@@ -13,14 +13,14 @@ export default async function DashboardPage() {
   const ordersCountResult = await supabase
     .from('delivery_orders')
     .select('id', { count: 'exact', head: true })
-    .or('status.neq.cancelled,status.is.null')
+    .neq('status', 'cancelled')
     .eq('is_active', true)
   
   // Obtener TODOS los pedidos para calcular ingresos (no solo completed)
   const allOrdersResult = await supabase
     .from('delivery_orders')
     .select('id, total, status')
-    .or('status.neq.cancelled,status.is.null')
+    .neq('status', 'cancelled')
     .eq('is_active', true)
   
   // Contar pedidos completados/entregados
@@ -36,7 +36,7 @@ export default async function DashboardPage() {
     .in('status', ['pending', 'confirmed', 'preparing', 'shipped'])
   
   const [usersResult, productsResult] = await Promise.all([
-    // Total de usuarios activos
+    // Total de usuarios activos (is_active = true o null)
     supabase
       .from('user_profiles')
       .select('id', { count: 'exact', head: true })
@@ -62,15 +62,14 @@ export default async function DashboardPage() {
     totalRevenue = allOrders.reduce((sum: number, order: any) => {
       return sum + (Number(order.total) || 0)
     }, 0)
-    console.log(`Total revenue: S/ ${totalRevenue} from ${allOrders.length} orders`)
   }
 
-  // Obtener conteos por rol
+  // Obtener conteos por rol - comerciantes son los que tienen role = 'comerciante' o NULL (clientes normales)
   const { count: comerciantesCount } = await supabase
     .from('user_profiles')
     .select('*', { count: 'exact', head: true })
     .or('role.eq.comerciante,role.is.null')
-    .or('is_active.eq.true,is_active.is.null')
+    .neq('is_active', false)
 
   const { count: repartidoresCount } = await supabase
     .from('user_profiles')

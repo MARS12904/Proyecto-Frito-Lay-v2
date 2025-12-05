@@ -166,6 +166,8 @@ export class DeliveryService {
       .filter((id: string, index: number, self: string[]) => self.indexOf(id) === index) || [];
 
     let customerMap = new Map();
+    let customerAddressMap = new Map(); // Mapa para direcciones por defecto de cada cliente
+    
     if (customerIds.length > 0) {
       const { data: customers } = await supabase
         .from('user_profiles')
@@ -179,6 +181,27 @@ export class DeliveryService {
             email: customer.email,
             phone: customer.phone,
           });
+        });
+      }
+      
+      // Obtener direcciones de los clientes (para pedidos sin dirección)
+      const { data: customerAddresses } = await supabase
+        .from('delivery_addresses')
+        .select('user_id, address, zone, reference, is_default')
+        .in('user_id', customerIds)
+        .order('is_default', { ascending: false })
+        .order('created_at', { ascending: false });
+      
+      if (customerAddresses) {
+        // Guardar solo la primera dirección de cada cliente (prioridad: default > más reciente)
+        customerAddresses.forEach((addr: any) => {
+          if (!customerAddressMap.has(addr.user_id)) {
+            customerAddressMap.set(addr.user_id, {
+              address: addr.address,
+              zone: addr.zone,
+              reference: addr.reference,
+            });
+          }
         });
       }
     }
@@ -213,7 +236,7 @@ export class DeliveryService {
       
       if (order.delivery_address) {
         if (typeof order.delivery_address === 'string' && order.delivery_address.length === 36) {
-          // Es un UUID, buscar en el mapa
+          // Es un UUID, buscar en el mapa de direcciones
           const addressData = addressMap.get(order.delivery_address);
           if (addressData) {
             deliveryAddress = addressData.address || '';
@@ -225,6 +248,16 @@ export class DeliveryService {
         } else {
           // Es texto directo
           deliveryAddress = order.delivery_address;
+        }
+      }
+      
+      // Si no hay dirección en el pedido, buscar la dirección del cliente
+      if (!deliveryAddress && order.created_by) {
+        const customerAddress = customerAddressMap.get(order.created_by);
+        if (customerAddress) {
+          deliveryAddress = customerAddress.address || '';
+          deliveryZone = customerAddress.zone || '';
+          deliveryReference = customerAddress.reference || '';
         }
       }
 
@@ -358,14 +391,31 @@ export class DeliveryService {
       console.error('Error fetching order items:', itemsError);
     }
 
-    // Obtener dirección si es UUID
+    // Obtener dirección - prioridad: delivery_address_id > delivery_address > dirección del usuario
     let deliveryAddress = '';
     let deliveryZone = '';
     let deliveryReference = '';
     
-    if (order?.delivery_address) {
+    // 1. Primero intentar con delivery_address_id (nueva relación directa)
+    if (order?.delivery_address_id) {
+      const { data: addressData } = await supabase
+        .from('delivery_addresses')
+        .select('address, zone, reference')
+        .eq('id', order.delivery_address_id)
+        .maybeSingle();
+      
+      if (addressData) {
+        deliveryAddress = addressData.address || '';
+        deliveryZone = addressData.zone || '';
+        deliveryReference = addressData.reference || '';
+        console.log('Found address via delivery_address_id:', deliveryAddress);
+      }
+    }
+    
+    // 2. Si no hay, intentar con delivery_address (texto o UUID legacy)
+    if (!deliveryAddress && order?.delivery_address) {
       if (typeof order.delivery_address === 'string' && order.delivery_address.length === 36) {
-        // Es un UUID, obtener de delivery_addresses
+        // Es un UUID, obtener de delivery_addresses por ID
         const { data: addressData } = await supabase
           .from('delivery_addresses')
           .select('address, zone, reference')
@@ -377,11 +427,48 @@ export class DeliveryService {
           deliveryZone = addressData.zone || '';
           deliveryReference = addressData.reference || '';
         } else {
+          // No se encontró por ID, usar como texto
           deliveryAddress = order.delivery_address;
         }
       } else {
         // Es texto directo
         deliveryAddress = order.delivery_address;
+      }
+    }
+    
+    // 3. Si aún no hay dirección, buscar la dirección del cliente
+    if (!deliveryAddress && order?.created_by) {
+      console.log('No address in order, fetching default address for user:', order.created_by);
+      
+      // Buscar primero la dirección por defecto
+      const { data: defaultAddress } = await supabase
+        .from('delivery_addresses')
+        .select('address, zone, reference')
+        .eq('user_id', order.created_by)
+        .eq('is_default', true)
+        .maybeSingle();
+      
+      if (defaultAddress) {
+        deliveryAddress = defaultAddress.address || '';
+        deliveryZone = defaultAddress.zone || '';
+        deliveryReference = defaultAddress.reference || '';
+        console.log('Found default address:', deliveryAddress);
+      } else {
+        // Si no hay dirección por defecto, buscar cualquier dirección del usuario
+        const { data: anyAddress } = await supabase
+          .from('delivery_addresses')
+          .select('address, zone, reference')
+          .eq('user_id', order.created_by)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (anyAddress) {
+          deliveryAddress = anyAddress.address || '';
+          deliveryZone = anyAddress.zone || '';
+          deliveryReference = anyAddress.reference || '';
+          console.log('Found user address:', deliveryAddress);
+        }
       }
     }
 
@@ -464,24 +551,51 @@ export class DeliveryService {
     // Actualizar también el estado de la orden en delivery_orders
     const assignment = await this.getAssignment(assignmentId);
     if (assignment?.order_id) {
-      let orderStatus: string = status;
-      if (status === 'assigned') orderStatus = 'assigned';
-      if (status === 'in_transit') orderStatus = 'in_transit';
-      if (status === 'delivered') orderStatus = 'delivered';
-      if (status === 'failed') orderStatus = 'failed';
+      // Mapear estados de entrega a estados del pedido
+      let deliveryStatus: string = status;
+      let mainStatus: string | undefined;
+      
+      // Determinar el estado principal del pedido según el estado de entrega
+      switch (status) {
+        case 'assigned':
+          deliveryStatus = 'assigned';
+          mainStatus = 'confirmed'; // Pedido confirmado cuando se asigna
+          break;
+        case 'in_transit':
+          deliveryStatus = 'in_transit';
+          mainStatus = 'shipped'; // Pedido enviado cuando está en tránsito
+          break;
+        case 'delivered':
+          deliveryStatus = 'delivered';
+          mainStatus = 'delivered'; // Pedido entregado
+          break;
+        case 'failed':
+          deliveryStatus = 'failed';
+          mainStatus = 'pending'; // Volver a pendiente si falla la entrega
+          break;
+      }
 
-      // Actualizar delivery_status en delivery_orders
+      // Actualizar AMBOS estados en delivery_orders
+      const updatePayload: any = { 
+        delivery_status: deliveryStatus,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Solo actualizar status principal si está definido
+      if (mainStatus) {
+        updatePayload.status = mainStatus;
+      }
+      
       const { error: orderUpdateError } = await supabase
         .from('delivery_orders')
-        .update({ 
-          delivery_status: orderStatus as any,
-          updated_at: new Date().toISOString()
-        })
+        .update(updatePayload)
         .eq('id', assignment.order_id);
 
       if (orderUpdateError) {
         console.error('Error updating delivery_orders status:', orderUpdateError);
         // No fallar si esto falla, la asignación ya se actualizó
+      } else {
+        console.log(`Order ${assignment.order_id} updated: status=${mainStatus}, delivery_status=${deliveryStatus}`);
       }
     }
 

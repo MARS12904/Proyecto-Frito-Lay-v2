@@ -15,11 +15,29 @@ import { useAuth } from '../contexts/AuthContext';
 import { deliveryAddressesService } from '../services/deliveryAddressesService';
 import { DeliveryAddress } from '../data/userStorage';
 
+// Función para parsear fecha YYYY-MM-DD sin problemas de zona horaria
+const parseLocalDate = (dateStr: string): Date => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day); // month es 0-indexed
+};
+
+// Función para formatear fecha a string legible
+const formatDateForDisplay = (dateStr: string): string => {
+  const date = parseLocalDate(dateStr);
+  return date.toLocaleDateString('es-PE', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};
+
 interface DeliverySchedule {
   id: string;
   date: string;
   timeSlot: string;
   address: string;
+  addressId?: string; // ID de la dirección en delivery_addresses
   notes?: string;
 }
 
@@ -232,6 +250,7 @@ export default function DeliveryScheduler({
       date: selectedDate,
       timeSlot: selectedTimeData.label,
       address: address.trim(),
+      addressId: selectedAddressId || undefined, // ID de la dirección seleccionada
       notes: notes.trim() || undefined,
     };
 
@@ -512,12 +531,7 @@ export default function DeliveryScheduler({
               <View style={styles.confirmationText}>
                 <Text style={styles.confirmationLabel}>Fecha:</Text>
                 <Text style={styles.confirmationValue}>
-                  {new Date(selectedDate).toLocaleDateString('es-PE', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
+                  {formatDateForDisplay(selectedDate)}
                 </Text>
               </View>
             </View>

@@ -13,12 +13,15 @@ import {
   View,
 } from 'react-native';
 import { DeliveryService, DeliveryAssignment } from '../../services/deliveryService';
+import { useResponsive } from '../../hooks/useResponsive';
+import { Colors, BorderRadius, Shadows, DeliveryStatusColors, DeliveryStatusText } from '../../constants/theme';
 
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [assignment, setAssignment] = useState<DeliveryAssignment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+  const { fs, sp, wp, isTablet, isSmallPhone, isLandscape } = useResponsive();
 
   useEffect(() => {
     loadAssignment();
@@ -149,39 +152,103 @@ export default function OrderDetailScreen() {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'assigned':
-        return '#FFA500';
-      case 'in_transit':
-        return '#007AFF';
-      case 'delivered':
-        return '#34C759';
-      case 'failed':
-        return '#FF3B30';
-      default:
-        return '#666';
-    }
+    return DeliveryStatusColors[status as keyof typeof DeliveryStatusColors] || Colors.textSecondary;
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
-      case 'assigned':
-        return 'Asignado';
-      case 'in_transit':
-        return 'En Tránsito';
-      case 'delivered':
-        return 'Entregado';
-      case 'failed':
-        return 'Fallido';
-      default:
-        return status;
-    }
+    return DeliveryStatusText[status] || status;
+  };
+
+  // Estilos dinámicos responsive
+  const dynamicStyles = {
+    contentContainer: {
+      maxWidth: isTablet ? 700 : undefined,
+      alignSelf: isTablet ? 'center' as const : undefined,
+      width: isTablet ? '100%' : undefined,
+    },
+    statusSection: {
+      padding: sp(isTablet ? 28 : 20),
+    },
+    statusBadge: {
+      paddingHorizontal: sp(isTablet ? 20 : 16),
+      paddingVertical: sp(isTablet ? 10 : 8),
+    },
+    statusText: {
+      fontSize: fs(isTablet ? 16 : 14),
+    },
+    orderNumber: {
+      fontSize: fs(isTablet ? 22 : 18),
+    },
+    section: {
+      marginTop: sp(isTablet ? 20 : 16),
+      padding: sp(isTablet ? 20 : 16),
+    },
+    sectionTitle: {
+      fontSize: fs(isTablet ? 20 : 18),
+      marginBottom: sp(isTablet ? 20 : 16),
+    },
+    infoRow: {
+      marginBottom: sp(isTablet ? 20 : 16),
+    },
+    infoIconSize: isTablet ? 24 : 20,
+    infoContent: {
+      marginLeft: sp(isTablet ? 16 : 12),
+    },
+    infoLabel: {
+      fontSize: fs(isTablet ? 14 : 12),
+    },
+    infoValue: {
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    itemRow: {
+      paddingVertical: sp(isTablet ? 16 : 12),
+    },
+    itemName: {
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    itemBrand: {
+      fontSize: fs(isTablet ? 16 : 14),
+    },
+    itemQuantity: {
+      fontSize: fs(isTablet ? 16 : 14),
+    },
+    itemQuantityBold: {
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    itemSubtotal: {
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    notesText: {
+      fontSize: fs(isTablet ? 16 : 14),
+      lineHeight: fs(isTablet ? 24 : 20),
+    },
+    actionsSection: {
+      padding: sp(isTablet ? 20 : 16),
+      gap: sp(isTablet ? 16 : 12),
+    },
+    actionButton: {
+      padding: sp(isTablet ? 18 : 16),
+      gap: sp(isTablet ? 12 : 8),
+    },
+    actionButtonText: {
+      fontSize: fs(isTablet ? 18 : 16),
+    },
+    actionIconSize: isTablet ? 24 : 20,
+    // Para tablets en landscape, mostrar acciones en grid
+    actionsGrid: isTablet && isLandscape ? {
+      flexDirection: 'row' as const,
+      flexWrap: 'wrap' as const,
+    } : undefined,
+    actionButtonGrid: isTablet && isLandscape ? {
+      flex: 1,
+      minWidth: wp(40),
+    } : undefined,
   };
 
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
@@ -197,58 +264,63 @@ export default function OrderDetailScreen() {
   const order = assignment.order;
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      contentContainerStyle={dynamicStyles.contentContainer}
+    >
       {/* Estado del Pedido */}
-      <View style={styles.statusSection}>
+      <View style={[styles.statusSection, dynamicStyles.statusSection]}>
         <View
           style={[
             styles.statusBadge,
+            dynamicStyles.statusBadge,
             { backgroundColor: getStatusColor(assignment.status) + '20' },
           ]}
         >
           <Text
             style={[
               styles.statusText,
+              dynamicStyles.statusText,
               { color: getStatusColor(assignment.status) },
             ]}
           >
             {getStatusText(assignment.status)}
           </Text>
         </View>
-        <Text style={styles.orderNumber}>
+        <Text style={[styles.orderNumber, dynamicStyles.orderNumber]}>
           Pedido #{order?.order_number || 'N/A'}
         </Text>
       </View>
 
       {/* Información del Cliente */}
       {order?.customer && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Información del Cliente</Text>
+        <View style={[styles.section, dynamicStyles.section]}>
+          <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>Información del Cliente</Text>
           
-          <View style={styles.infoRow}>
-            <Ionicons name="person-outline" size={20} color="#007AFF" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Nombre</Text>
-              <Text style={styles.infoValue}>{order.customer.name}</Text>
+          <View style={[styles.infoRow, dynamicStyles.infoRow]}>
+            <Ionicons name="person-outline" size={dynamicStyles.infoIconSize} color={Colors.primary} />
+            <View style={[styles.infoContent, dynamicStyles.infoContent]}>
+              <Text style={[styles.infoLabel, dynamicStyles.infoLabel]}>Nombre</Text>
+              <Text style={[styles.infoValue, dynamicStyles.infoValue]}>{order.customer.name}</Text>
             </View>
           </View>
 
           {order.customer.phone && (
-            <View style={styles.infoRow}>
-              <Ionicons name="call-outline" size={20} color="#007AFF" />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Teléfono</Text>
-                <Text style={styles.infoValue}>{order.customer.phone}</Text>
+            <View style={[styles.infoRow, dynamicStyles.infoRow]}>
+              <Ionicons name="call-outline" size={dynamicStyles.infoIconSize} color={Colors.primary} />
+              <View style={[styles.infoContent, dynamicStyles.infoContent]}>
+                <Text style={[styles.infoLabel, dynamicStyles.infoLabel]}>Teléfono</Text>
+                <Text style={[styles.infoValue, dynamicStyles.infoValue]}>{order.customer.phone}</Text>
               </View>
             </View>
           )}
 
           {order.customer.email && (
-            <View style={styles.infoRow}>
-              <Ionicons name="mail-outline" size={20} color="#007AFF" />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Email</Text>
-                <Text style={styles.infoValue}>{order.customer.email}</Text>
+            <View style={[styles.infoRow, dynamicStyles.infoRow]}>
+              <Ionicons name="mail-outline" size={dynamicStyles.infoIconSize} color={Colors.primary} />
+              <View style={[styles.infoContent, dynamicStyles.infoContent]}>
+                <Text style={[styles.infoLabel, dynamicStyles.infoLabel]}>Email</Text>
+                <Text style={[styles.infoValue, dynamicStyles.infoValue]}>{order.customer.email}</Text>
               </View>
             </View>
           )}
@@ -256,35 +328,42 @@ export default function OrderDetailScreen() {
       )}
 
       {/* Información de Entrega */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Información de Entrega</Text>
+      <View style={[styles.section, dynamicStyles.section]}>
+        <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>Información de Entrega</Text>
         
-        {order?.delivery_address && (
-          <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={20} color="#007AFF" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Dirección de Entrega</Text>
-              <Text style={styles.infoValue}>{order.delivery_address}</Text>
-              {order.delivery_zone && (
-                <Text style={[styles.infoValue, { marginTop: 4, fontSize: 14, color: '#666' }]}>
-                  Zona: {order.delivery_zone}
-                </Text>
-              )}
-              {order.delivery_reference && (
-                <Text style={[styles.infoValue, { marginTop: 4, fontSize: 14, color: '#666' }]}>
-                  Referencia: {order.delivery_reference}
-                </Text>
-              )}
-            </View>
+        {/* Dirección de Entrega - Siempre mostrar esta sección */}
+        <View style={[styles.infoRow, dynamicStyles.infoRow]}>
+          <Ionicons name="location-outline" size={dynamicStyles.infoIconSize} color={Colors.primary} />
+          <View style={[styles.infoContent, dynamicStyles.infoContent]}>
+            <Text style={[styles.infoLabel, dynamicStyles.infoLabel]}>Dirección de Entrega</Text>
+            {order?.delivery_address ? (
+              <>
+                <Text style={[styles.infoValue, dynamicStyles.infoValue]}>{order.delivery_address}</Text>
+                {order.delivery_zone && (
+                  <Text style={[styles.infoValueSecondary, { fontSize: fs(14) }]}>
+                    Zona: {order.delivery_zone}
+                  </Text>
+                )}
+                {order.delivery_reference && (
+                  <Text style={[styles.infoValueSecondary, { fontSize: fs(14) }]}>
+                    Referencia: {order.delivery_reference}
+                  </Text>
+                )}
+              </>
+            ) : (
+              <Text style={[styles.infoValueSecondary, { fontSize: fs(14), fontStyle: 'italic' }]}>
+                No hay dirección registrada
+              </Text>
+            )}
           </View>
-        )}
+        </View>
 
         {order?.delivery_date && (
-          <View style={styles.infoRow}>
-            <Ionicons name="calendar-outline" size={20} color="#007AFF" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Fecha de Entrega</Text>
-              <Text style={styles.infoValue}>
+          <View style={[styles.infoRow, dynamicStyles.infoRow]}>
+            <Ionicons name="calendar-outline" size={dynamicStyles.infoIconSize} color={Colors.primary} />
+            <View style={[styles.infoContent, dynamicStyles.infoContent]}>
+              <Text style={[styles.infoLabel, dynamicStyles.infoLabel]}>Fecha de Entrega</Text>
+              <Text style={[styles.infoValue, dynamicStyles.infoValue]}>
                 {new Date(order.delivery_date).toLocaleDateString('es-ES', {
                   weekday: 'long',
                   year: 'numeric',
@@ -297,20 +376,20 @@ export default function OrderDetailScreen() {
         )}
 
         {order?.delivery_time_slot && (
-          <View style={styles.infoRow}>
-            <Ionicons name="time-outline" size={20} color="#007AFF" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Horario</Text>
-              <Text style={styles.infoValue}>{order.delivery_time_slot}</Text>
+          <View style={[styles.infoRow, dynamicStyles.infoRow]}>
+            <Ionicons name="time-outline" size={dynamicStyles.infoIconSize} color={Colors.primary} />
+            <View style={[styles.infoContent, dynamicStyles.infoContent]}>
+              <Text style={[styles.infoLabel, dynamicStyles.infoLabel]}>Horario</Text>
+              <Text style={[styles.infoValue, dynamicStyles.infoValue]}>{order.delivery_time_slot}</Text>
             </View>
           </View>
         )}
 
-        <View style={styles.infoRow}>
-          <Ionicons name="cash-outline" size={20} color="#007AFF" />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Total</Text>
-            <Text style={styles.infoValue}>
+        <View style={[styles.infoRow, dynamicStyles.infoRow]}>
+          <Ionicons name="cash-outline" size={dynamicStyles.infoIconSize} color={Colors.primary} />
+          <View style={[styles.infoContent, dynamicStyles.infoContent]}>
+            <Text style={[styles.infoLabel, dynamicStyles.infoLabel]}>Total</Text>
+            <Text style={[styles.infoValue, dynamicStyles.infoValue, { color: Colors.success, fontWeight: 'bold' }]}>
               S/. {order?.total?.toFixed(2) || '0.00'}
             </Text>
           </View>
@@ -319,29 +398,29 @@ export default function OrderDetailScreen() {
 
       {/* Notas e Indicaciones Adicionales */}
       {order?.notes && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Descripción e Indicaciones Adicionales</Text>
-          <Text style={styles.notesText}>{order.notes}</Text>
+        <View style={[styles.section, dynamicStyles.section]}>
+          <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>Descripción e Indicaciones Adicionales</Text>
+          <Text style={[styles.notesText, dynamicStyles.notesText]}>{order.notes}</Text>
         </View>
       )}
 
       {/* Items del Pedido */}
       {order?.items && order.items.length > 0 ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Productos</Text>
+        <View style={[styles.section, dynamicStyles.section]}>
+          <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>Productos</Text>
           {order.items.map((item) => (
-            <View key={item.id} style={styles.itemRow}>
+            <View key={item.id} style={[styles.itemRow, dynamicStyles.itemRow]}>
               <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>{item.product_name}</Text>
+                <Text style={[styles.itemName, dynamicStyles.itemName]}>{item.product_name}</Text>
                 {item.product_brand && (
-                  <Text style={styles.itemBrand}>{item.product_brand}</Text>
+                  <Text style={[styles.itemBrand, dynamicStyles.itemBrand]}>{item.product_brand}</Text>
                 )}
               </View>
               <View style={styles.itemRight}>
-                <Text style={styles.itemQuantity}>
-                  Cantidad: <Text style={styles.itemQuantityBold}>{item.quantity}</Text>
+                <Text style={[styles.itemQuantity, dynamicStyles.itemQuantity]}>
+                  Cantidad: <Text style={[styles.itemQuantityBold, dynamicStyles.itemQuantityBold]}>{item.quantity}</Text>
                 </Text>
-                <Text style={styles.itemSubtotal}>
+                <Text style={[styles.itemSubtotal, dynamicStyles.itemSubtotal]}>
                   S/. {item.subtotal.toFixed(2)}
                 </Text>
               </View>
@@ -349,62 +428,62 @@ export default function OrderDetailScreen() {
           ))}
         </View>
       ) : (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Productos</Text>
+        <View style={[styles.section, dynamicStyles.section]}>
+          <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>Productos</Text>
           <Text style={styles.emptyText}>No hay productos en este pedido</Text>
         </View>
       )}
 
       {/* Foto de Entrega */}
       {assignment.delivery_photo_url && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Foto de Entrega</Text>
+        <View style={[styles.section, dynamicStyles.section]}>
+          <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>Foto de Entrega</Text>
           <Text style={styles.photoUrl}>{assignment.delivery_photo_url}</Text>
         </View>
       )}
 
       {/* Acciones */}
-      <View style={styles.actionsSection}>
+      <View style={[styles.actionsSection, dynamicStyles.actionsSection, dynamicStyles.actionsGrid]}>
         {assignment.status === 'assigned' && (
           <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonPrimary]}
+            style={[styles.actionButton, styles.actionButtonPrimary, dynamicStyles.actionButton, dynamicStyles.actionButtonGrid]}
             onPress={() => updateStatus('in_transit')}
             disabled={isUpdating}
           >
-            <Ionicons name="play-outline" size={20} color="#fff" />
-            <Text style={styles.actionButtonText}>Iniciar Entrega</Text>
+            <Ionicons name="play-outline" size={dynamicStyles.actionIconSize} color={Colors.white} />
+            <Text style={[styles.actionButtonText, dynamicStyles.actionButtonText]}>Iniciar Entrega</Text>
           </TouchableOpacity>
         )}
 
         {assignment.status === 'in_transit' && (
           <>
             <TouchableOpacity
-              style={[styles.actionButton, styles.actionButtonSuccess]}
+              style={[styles.actionButton, styles.actionButtonSuccess, dynamicStyles.actionButton, dynamicStyles.actionButtonGrid]}
               onPress={() => updateStatus('delivered')}
               disabled={isUpdating}
             >
-              <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-              <Text style={styles.actionButtonText}>Marcar como Entregado</Text>
+              <Ionicons name="checkmark-circle-outline" size={dynamicStyles.actionIconSize} color={Colors.white} />
+              <Text style={[styles.actionButtonText, dynamicStyles.actionButtonText]}>Marcar como Entregado</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionButton, styles.actionButtonSecondary]}
+              style={[styles.actionButton, styles.actionButtonSecondary, dynamicStyles.actionButton, dynamicStyles.actionButtonGrid]}
               onPress={takeDeliveryPhoto}
               disabled={isUpdating}
             >
-              <Ionicons name="camera-outline" size={20} color="#007AFF" />
-              <Text style={[styles.actionButtonText, { color: '#007AFF' }]}>
+              <Ionicons name="camera-outline" size={dynamicStyles.actionIconSize} color={Colors.primary} />
+              <Text style={[styles.actionButtonText, dynamicStyles.actionButtonText, { color: Colors.primary }]}>
                 Tomar Foto
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionButton, styles.actionButtonSecondary]}
+              style={[styles.actionButton, styles.actionButtonSecondary, dynamicStyles.actionButton, dynamicStyles.actionButtonGrid]}
               onPress={trackLocation}
               disabled={isUpdating}
             >
-              <Ionicons name="location-outline" size={20} color="#007AFF" />
-              <Text style={[styles.actionButtonText, { color: '#007AFF' }]}>
+              <Ionicons name="location-outline" size={dynamicStyles.actionIconSize} color={Colors.primary} />
+              <Text style={[styles.actionButtonText, dynamicStyles.actionButtonText, { color: Colors.primary }]}>
                 Registrar Ubicación
               </Text>
             </TouchableOpacity>
@@ -413,12 +492,12 @@ export default function OrderDetailScreen() {
 
         {assignment.status !== 'delivered' && assignment.status !== 'failed' && (
           <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonDanger]}
+            style={[styles.actionButton, styles.actionButtonDanger, dynamicStyles.actionButton, dynamicStyles.actionButtonGrid]}
             onPress={() => updateStatus('failed')}
             disabled={isUpdating}
           >
-            <Ionicons name="close-circle-outline" size={20} color="#fff" />
-            <Text style={styles.actionButtonText}>Marcar como Fallido</Text>
+            <Ionicons name="close-circle-outline" size={dynamicStyles.actionIconSize} color={Colors.white} />
+            <Text style={[styles.actionButtonText, dynamicStyles.actionButtonText]}>Marcar como Fallido</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -429,7 +508,7 @@ export default function OrderDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: Colors.background,
   },
   loadingContainer: {
     flex: 1,
@@ -444,140 +523,120 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#999',
+    color: Colors.textLight,
   },
   statusSection: {
-    backgroundColor: '#fff',
-    padding: 20,
+    backgroundColor: Colors.backgroundCard,
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#e1e5e9',
+    borderBottomColor: Colors.border,
+    ...Shadows.sm,
   },
   statusBadge: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: BorderRadius.full,
     marginBottom: 12,
   },
   statusText: {
-    fontSize: 14,
     fontWeight: '600',
   },
   orderNumber: {
-    fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: Colors.text,
   },
   section: {
-    backgroundColor: '#fff',
-    marginTop: 16,
-    padding: 16,
+    backgroundColor: Colors.backgroundCard,
   },
   sectionTitle: {
-    fontSize: 18,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
+    color: Colors.text,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 16,
   },
   infoContent: {
-    marginLeft: 12,
     flex: 1,
   },
   infoLabel: {
-    fontSize: 12,
-    color: '#666',
+    color: Colors.textSecondary,
     marginBottom: 4,
   },
   infoValue: {
-    fontSize: 16,
-    color: '#333',
+    color: Colors.text,
+  },
+  infoValueSecondary: {
+    color: Colors.textSecondary,
+    marginTop: 4,
   },
   itemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: Colors.borderLight,
   },
   itemInfo: {
     flex: 1,
   },
   itemName: {
-    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: Colors.text,
     marginBottom: 4,
   },
   itemBrand: {
-    fontSize: 14,
-    color: '#666',
+    color: Colors.textSecondary,
     marginBottom: 4,
   },
   itemRight: {
     alignItems: 'flex-end',
   },
   itemQuantity: {
-    fontSize: 14,
-    color: '#666',
+    color: Colors.textSecondary,
     marginBottom: 8,
   },
   itemQuantityBold: {
-    fontSize: 16,
     fontWeight: '700',
-    color: '#007AFF',
+    color: Colors.primary,
   },
   itemSubtotal: {
-    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: Colors.text,
   },
   notesText: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
+    color: Colors.textSecondary,
+  },
+  emptyText: {
+    color: Colors.textLight,
+    textAlign: 'center',
   },
   photoUrl: {
     fontSize: 12,
-    color: '#007AFF',
+    color: Colors.primary,
   },
-  actionsSection: {
-    padding: 16,
-    gap: 12,
-  },
+  actionsSection: {},
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    gap: 8,
+    borderRadius: BorderRadius.md,
+    ...Shadows.sm,
   },
   actionButtonPrimary: {
-    backgroundColor: '#007AFF',
+    backgroundColor: Colors.primary,
   },
   actionButtonSuccess: {
-    backgroundColor: '#34C759',
+    backgroundColor: Colors.success,
   },
   actionButtonDanger: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: Colors.error,
   },
   actionButtonSecondary: {
-    backgroundColor: '#fff',
+    backgroundColor: Colors.backgroundCard,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: Colors.primary,
   },
   actionButtonText: {
-    fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: Colors.white,
   },
 });
-
-
-

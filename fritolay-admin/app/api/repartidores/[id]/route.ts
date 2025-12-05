@@ -59,9 +59,44 @@ export async function DELETE(request: Request, { params }: Params) {
       )
     }
 
-    // Eliminar de auth
-    await adminClient.auth.admin.deleteUser(id)
+    // 1. Eliminar asignaciones de entregas asociadas
+    const { error: assignmentsError } = await adminClient
+      .from('delivery_assignments')
+      .delete()
+      .eq('repartidor_id', id)
+    
+    if (assignmentsError) {
+      console.warn('Error deleting delivery assignments:', assignmentsError)
+      // No fallar, continuar con la eliminación
+    }
 
+    // 2. Eliminar el perfil de user_profiles
+    const { error: profileError } = await adminClient
+      .from('user_profiles')
+      .delete()
+      .eq('id', id)
+    
+    if (profileError) {
+      console.error('Error deleting user profile:', profileError)
+      return NextResponse.json(
+        { message: 'Error eliminando perfil: ' + profileError.message },
+        { status: 500 }
+      )
+    }
+
+    // 3. Eliminar de auth.users
+    const { error: authError } = await adminClient.auth.admin.deleteUser(id)
+    
+    if (authError) {
+      console.error('Error deleting auth user:', authError)
+      // El perfil ya fue eliminado, informar pero considerar éxito parcial
+      return NextResponse.json({ 
+        message: 'Perfil eliminado, pero hubo un error eliminando credenciales de autenticación',
+        warning: authError.message
+      })
+    }
+
+    console.log('Repartidor eliminado completamente:', id)
     return NextResponse.json({ message: 'Repartidor eliminado exitosamente' })
   } catch (error: any) {
     console.error('Error deleting repartidor:', error)

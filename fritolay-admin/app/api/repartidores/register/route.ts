@@ -74,7 +74,8 @@ export async function POST(request: Request) {
 
     console.log('Auth user created:', authData.user.id)
 
-    // Crear perfil de repartidor
+    // Crear o actualizar perfil de repartidor
+    // Usamos upsert porque puede existir un trigger que crea el perfil automáticamente
     const profileData: any = {
       id: authData.user.id,
       email: normalizedEmail,
@@ -87,15 +88,54 @@ export async function POST(request: Request) {
       preferences: { notifications: true, theme: 'auto' },
     }
 
-    console.log('Creating repartidor profile...')
-    const { data: profileDataResult, error: profileError } = await adminClient
+    console.log('Creating/updating repartidor profile...')
+    
+    // Primero intentar actualizar si ya existe (por trigger)
+    const { data: existingProfile } = await adminClient
       .from('user_profiles')
-      .insert(profileData)
-      .select()
+      .select('id')
+      .eq('id', authData.user.id)
       .single()
 
+    let profileDataResult
+    let profileError
+
+    if (existingProfile) {
+      // El perfil ya existe (creado por trigger), actualizarlo
+      console.log('Profile exists (from trigger), updating...')
+      const { data, error } = await adminClient
+        .from('user_profiles')
+        .update({
+          email: normalizedEmail,
+          name: normalizedName,
+          role: 'repartidor',
+          is_active: true,
+          phone: phone || null,
+          license_number: license_number || null,
+          phone_verified: false,
+          preferences: { notifications: true, theme: 'auto' },
+        })
+        .eq('id', authData.user.id)
+        .select()
+        .single()
+      
+      profileDataResult = data
+      profileError = error
+    } else {
+      // El perfil no existe, crearlo
+      console.log('Profile does not exist, creating...')
+      const { data, error } = await adminClient
+        .from('user_profiles')
+        .insert(profileData)
+        .select()
+        .single()
+      
+      profileDataResult = data
+      profileError = error
+    }
+
     if (profileError) {
-      console.error('Error creating profile:', profileError)
+      console.error('Error creating/updating profile:', profileError)
       
       try {
         await adminClient.auth.admin.deleteUser(authData.user.id)
