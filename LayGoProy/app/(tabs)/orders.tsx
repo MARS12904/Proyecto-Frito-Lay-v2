@@ -13,6 +13,8 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useOrders } from '../../contexts/OrdersContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '../../constants/theme';
+import { useResponsive } from '../../hooks/useResponsive';
+import { formatOrderLabel } from '../../utils/format';
 
 // Función para parsear fecha YYYY-MM-DD sin problemas de zona horaria
 const parseLocalDate = (dateStr: string): Date => {
@@ -145,6 +147,7 @@ export default function OrdersScreen() {
 }
 
 function OrdersContent() {
+  const { headerPaddingTop, scaleFont } = useResponsive();
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
@@ -211,7 +214,9 @@ function OrdersContent() {
       >
         <View style={styles.orderHeader}>
           <View style={styles.orderInfo}>
-            <Text style={styles.orderId}>Pedido {item.id}</Text>
+            <Text style={styles.orderId} numberOfLines={1}>
+              Pedido {formatOrderLabel(item.id)}
+            </Text>
             <Text style={styles.orderDate}>
               {formatDate(item.date, {
                 year: 'numeric',
@@ -304,8 +309,8 @@ function OrdersContent() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Mis Pedidos</Text>
+      <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+        <Text style={[styles.title, { fontSize: scaleFont(24) }]}>Mis Pedidos</Text>
         <Text style={styles.subtitle}>Gestiona tus pedidos de reabastecimiento</Text>
       </View>
 
@@ -364,7 +369,9 @@ function OrdersContent() {
             <ScrollView style={styles.modalContent}>
               <View style={styles.orderDetailsCard}>
                 <View style={styles.orderDetailsHeader}>
-                  <Text style={styles.orderDetailsId}>Pedido {selectedOrder.id}</Text>
+                  <Text style={styles.orderDetailsId} numberOfLines={1}>
+                    Pedido {formatOrderLabel(selectedOrder.id)}
+                  </Text>
                   <View style={[styles.statusBadge, { backgroundColor: statusConfig[selectedOrder.status].color }]}>
                     <Ionicons name={statusConfig[selectedOrder.status].icon as any} size={16} color={Colors.light.background} />
                     <Text style={styles.statusText}>{statusConfig[selectedOrder.status].label}</Text>
@@ -499,7 +506,6 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: Colors.light.backgroundCard,
     padding: Spacing.lg,
-    paddingTop: Spacing.xxl,
     ...Shadows.sm,
   },
   title: {
@@ -560,11 +566,14 @@ const styles = StyleSheet.create({
   },
   orderInfo: {
     flex: 1,
+    minWidth: 0,
+    marginRight: Spacing.sm,
   },
   orderId: {
     fontSize: FontSizes.md,
     fontWeight: '600',
     color: Colors.light.text,
+    flexShrink: 1,
   },
   orderDate: {
     fontSize: FontSizes.sm,
@@ -593,6 +602,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.full,
+    flexShrink: 0,
   },
   statusText: {
     color: Colors.light.background,

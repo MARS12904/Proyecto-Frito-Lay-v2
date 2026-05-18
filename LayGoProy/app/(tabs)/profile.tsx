@@ -26,6 +26,7 @@ import {
   Shadows, 
   responsive 
 } from '../../constants/theme';
+import { useResponsive } from '../../hooks/useResponsive';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -37,6 +38,7 @@ export default function ProfileScreen() {
     user?.preferences?.notifications ?? true
   );
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const { headerPaddingTop } = useResponsive();
 
   // Recargar métricas cuando el usuario cambia o cuando se monta el componente
   useEffect(() => {
@@ -218,7 +220,7 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header del perfil */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: headerPaddingTop + Spacing.lg }]}>
         <View style={styles.profileImageContainer}>
           {isUploadingImage ? (
             <View style={[styles.defaultProfileImage, styles.uploadingContainer]}>
@@ -262,7 +264,9 @@ export default function ProfileScreen() {
             <View style={styles.statIconContainer}>
               <Ionicons name="receipt" size={responsive({ xs: 20, sm: 22, md: 24 })} color={Colors.light.primary} />
             </View>
-            <Text style={styles.statNumber}>{merchantStats.totalOrders}</Text>
+            <Text style={styles.statNumber} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              {merchantStats.totalOrders}
+            </Text>
             <Text style={styles.statLabel}>Pedidos</Text>
           </View>
           
@@ -270,7 +274,9 @@ export default function ProfileScreen() {
             <View style={styles.statIconContainer}>
               <Ionicons name="cash" size={responsive({ xs: 20, sm: 22, md: 24 })} color={Colors.light.success} />
             </View>
-            <Text style={styles.statNumber}>S/ {merchantStats.totalSpent.toFixed(0)}</Text>
+            <Text style={styles.statNumber} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              S/ {merchantStats.totalSpent.toFixed(0)}
+            </Text>
             <Text style={styles.statLabel}>Gastado</Text>
           </View>
           
@@ -278,7 +284,9 @@ export default function ProfileScreen() {
             <View style={styles.statIconContainer}>
               <Ionicons name="trending-down" size={responsive({ xs: 20, sm: 22, md: 24 })} color={Colors.light.warning} />
             </View>
-            <Text style={styles.statNumber}>S/ {merchantStats.totalSavings.toFixed(0)}</Text>
+            <Text style={styles.statNumber} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              S/ {merchantStats.totalSavings.toFixed(0)}
+            </Text>
             <Text style={styles.statLabel}>Ahorrado</Text>
           </View>
         </View>
@@ -522,7 +530,6 @@ const styles = StyleSheet.create({
   // Header
   header: {
     backgroundColor: Colors.light.backgroundCard,
-    paddingTop: responsive({ xs: 50, sm: 60, md: 70 }),
     paddingBottom: responsive({ xs: 24, sm: 28, md: 32 }),
     paddingHorizontal: Spacing.lg,
     alignItems: 'center',
@@ -618,6 +625,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: Colors.light.backgroundCard,
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,

@@ -8,6 +8,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
 import { useMetrics } from '../../contexts/MetricsContext';
 import { useOrders } from '../../contexts/OrdersContext';
+import { useResponsive } from '../../hooks/useResponsive';
+import { formatFirstName, formatOrderLabel } from '../../utils/format';
 
 export default function HomeScreen() {
   return <HomeContent />;
@@ -30,6 +32,7 @@ function HomeContent() {
   const [showDeliveryScheduler, setShowDeliveryScheduler] = useState(false);
   const [lastOrder, setLastOrder] = useState<any>(null);
   const cartSummary = getCartSummary();
+  const { headerPaddingTop, scaleFont } = useResponsive();
 
   // Recargar métricas cuando el usuario cambia o cuando se monta el componente
   useEffect(() => {
@@ -86,17 +89,19 @@ function HomeContent() {
   return (
     <ScrollView style={styles.container}>
       {/* Header con branding Frito-Lay */}
-      <ResponsiveCard style={styles.header} padding="lg">
-        <ResponsiveLayout direction="row" justify="space-between" align="center">
-          <View style={styles.brandContainer}>
-            <Text style={styles.brandText}>Frito-Lay</Text>
-            <Text style={styles.brandSubtext}>Comerciantes</Text>
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.welcomeText}>¡Hola, {user?.name}!</Text>
-            <Text style={styles.subtitleText}>Tu plataforma de reabastecimiento</Text>
-          </View>
-        </ResponsiveLayout>
+      <ResponsiveCard style={[styles.header, { paddingTop: headerPaddingTop }]} padding="lg">
+        <Text
+          style={[styles.brandLine, { fontSize: scaleFont(22) }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+        >
+          Frito-Lay <Text style={styles.brandAccent}>Comerciantes</Text>
+        </Text>
+        <Text style={[styles.welcomeText, { fontSize: scaleFont(16) }]} numberOfLines={1}>
+          ¡Hola, {formatFirstName(user?.name)}!
+        </Text>
+        <Text style={styles.subtitleText}>Tu plataforma de reabastecimiento</Text>
       </ResponsiveCard>
 
       {/* Modo de compra */}
@@ -121,23 +126,29 @@ function HomeContent() {
       {/* Dashboard de Negocio */}
       <ResponsiveCard style={styles.dashboardCard} padding="lg">
         <Text style={styles.sectionTitle}>Dashboard de Negocio</Text>
-        <ResponsiveLayout direction="row" justify="space-around" align="center" gap="sm">
+        <View style={styles.dashboardStatsRow}>
           <View style={styles.dashboardStat}>
             <Ionicons name="receipt" size={Dimensions.isSmallScreen ? 20 : 24} color={Colors.light.primary} />
-            <Text style={styles.dashboardNumber}>{merchantStats.totalOrders}</Text>
+            <Text style={styles.dashboardNumber} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              {merchantStats.totalOrders}
+            </Text>
             <Text style={styles.dashboardLabel}>Pedidos</Text>
           </View>
           <View style={styles.dashboardStat}>
             <Ionicons name="cash" size={Dimensions.isSmallScreen ? 20 : 24} color={Colors.light.success} />
-            <Text style={styles.dashboardNumber}>S/ {merchantStats.totalSpent.toFixed(0)}</Text>
+            <Text style={styles.dashboardNumber} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              S/ {merchantStats.totalSpent.toFixed(0)}
+            </Text>
             <Text style={styles.dashboardLabel}>Gastado</Text>
           </View>
           <View style={styles.dashboardStat}>
             <Ionicons name="trending-down" size={Dimensions.isSmallScreen ? 20 : 24} color={Colors.light.warning} />
-            <Text style={styles.dashboardNumber}>S/ {merchantStats.totalSavings.toFixed(0)}</Text>
+            <Text style={styles.dashboardNumber} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              S/ {merchantStats.totalSavings.toFixed(0)}
+            </Text>
             <Text style={styles.dashboardLabel}>Ahorrado</Text>
           </View>
-        </ResponsiveLayout>
+        </View>
         {/* Progreso mensual */}
         <View style={styles.monthlyProgress}>
           <View style={styles.progressHeader}>
@@ -167,7 +178,7 @@ function HomeContent() {
           <View style={styles.deliveryInfo}>
             <View style={styles.orderInfoRow}>
               <Text style={styles.orderLabel}>Pedido:</Text>
-              <Text style={styles.orderValue}>{lastOrder.id}</Text>
+              <Text style={styles.orderValue}>{formatOrderLabel(lastOrder.id)}</Text>
             </View>
             {lastOrder.deliveryDate && (
               <Text style={styles.deliveryDate}>Fecha: {lastOrder.deliveryDate}</Text>
@@ -278,28 +289,17 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.primary,
     marginBottom: Spacing.lg,
   },
-  brandContainer: {
-    alignItems: 'flex-start',
-    flex: 1,
-  },
-  brandText: {
-    fontSize: Dimensions.isSmallScreen ? FontSizes.xxl : FontSizes.xxxl,
+  brandLine: {
     fontWeight: 'bold',
     color: Colors.light.background,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
+    marginBottom: Spacing.sm,
   },
-  brandSubtext: {
-    fontSize: Dimensions.isSmallScreen ? FontSizes.xs : FontSizes.sm,
+  brandAccent: {
     color: Colors.light.accent,
-    fontWeight: '600',
-    marginTop: -Spacing.xs,
-  },
-  userInfo: {
-    alignItems: 'flex-end',
-    flex: 1,
+    fontWeight: '700',
   },
   welcomeText: {
-    fontSize: Dimensions.isSmallScreen ? FontSizes.md : FontSizes.lg,
     fontWeight: 'bold',
     color: Colors.light.background,
     marginBottom: Spacing.xs,
@@ -307,7 +307,11 @@ const styles = StyleSheet.create({
   subtitleText: {
     fontSize: Dimensions.isSmallScreen ? FontSizes.xs : FontSizes.sm,
     color: Colors.light.accent,
-    textAlign: 'right',
+  },
+  dashboardStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: Spacing.xs,
   },
   modeContainer: {
     marginHorizontal: Spacing.md,
@@ -511,12 +515,14 @@ const styles = StyleSheet.create({
   dashboardStat: {
     alignItems: 'center',
     flex: 1,
+    minWidth: 0,
   },
   dashboardNumber: {
-    fontSize: Dimensions.isSmallScreen ? FontSizes.lg : FontSizes.xl,
+    fontSize: Dimensions.isSmallScreen ? FontSizes.md : FontSizes.lg,
     fontWeight: 'bold',
     color: Colors.light.text,
     marginVertical: Spacing.xs,
+    textAlign: 'center',
   },
   dashboardLabel: {
     fontSize: Dimensions.isSmallScreen ? FontSizes.xs : FontSizes.sm,

@@ -9,14 +9,14 @@ import {
     TextInput,
     TouchableOpacity,
     View,
-    Dimensions,
 } from 'react-native';
-import { useAuth } from '../../contexts/AuthContext';
 import { router } from 'expo-router';
 import { useCart } from '../../contexts/CartContext';
 import DeliveryScheduler from '../../components/DeliveryScheduler';
 import ProductImage from '../../components/ProductImage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows, Dimensions as ThemeDimensions } from '../../constants/theme';
+import { useResponsive } from '../../hooks/useResponsive';
 
 export default function CartScreen() {
   return <CartContent />;
@@ -24,8 +24,10 @@ export default function CartScreen() {
 
 function CartContent() {
   const { items, totalItems, totalPrice, updateQuantity, removeFromCart, clearCart, deliverySchedule, setDeliverySchedule } = useCart();
-  const { user } = useAuth();
   const [showDeliveryScheduler, setShowDeliveryScheduler] = useState(false);
+  const insets = useSafeAreaInsets();
+  const { horizontalPadding, scaleFont } = useResponsive();
+  const shippingFee = deliverySchedule ? 15 : 0;
 
   const handleQuantityChange = (productId: string, quantity: number) => {
     if (quantity <= 0) {
@@ -89,8 +91,8 @@ function CartContent() {
         fallbackColor={Colors.light.primary}
       />
       <View style={styles.itemInfo}>
-        <Text style={styles.productName}>{item.product.name}</Text>
-        <Text style={styles.productPrice}>S/ {item.product.price.toFixed(2)}</Text>
+        <Text style={styles.productName} numberOfLines={2}>{item.product.name}</Text>
+        <Text style={styles.productPrice}>S/ {(item.unitPrice ?? item.product.price).toFixed(2)}</Text>
         <Text style={styles.productCategory}>{item.product.category}</Text>
         
         <View style={styles.quantityContainer}>
@@ -120,7 +122,7 @@ function CartContent() {
       
       <View style={styles.itemActions}>
         <Text style={styles.itemTotal}>
-          S/ {(item.product.price * item.quantity).toFixed(2)}
+          S/ {(item.subtotal ?? (item.unitPrice ?? item.product.price) * item.quantity).toFixed(2)}
         </Text>
         <TouchableOpacity
           style={styles.removeButton}
@@ -146,8 +148,8 @@ function CartContent() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Carrito de Compras</Text>
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm, paddingHorizontal: horizontalPadding }]}>
+        <Text style={[styles.title, { fontSize: scaleFont(22) }]}>Carrito de Compras</Text>
         <TouchableOpacity style={styles.clearButton} onPress={handleClearCart}>
           <Ionicons name="trash-outline" size={ThemeDimensions.isSmallScreen ? 18 : 20} color={Colors.light.error} />
           <Text style={styles.clearButtonText}>Vaciar</Text>
@@ -190,11 +192,11 @@ function CartContent() {
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Envío:</Text>
-            <Text style={styles.summaryValue}>{deliverySchedule ? 'S/ 15.00' : 'Gratis'}</Text>
+            <Text style={styles.summaryValue}>{shippingFee > 0 ? `S/ ${shippingFee.toFixed(2)}` : 'Gratis'}</Text>
           </View>
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Total:</Text>
-            <Text style={styles.totalValue}>S/ {(totalPrice + (deliverySchedule ? 15.00 : 0)).toFixed(2)}</Text>
+            <Text style={styles.totalValue}>S/ {(totalPrice + shippingFee).toFixed(2)}</Text>
           </View>
         </View>
 
@@ -236,9 +238,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    paddingTop: ThemeDimensions.isSmallScreen ? Spacing.xxl : 60,
     backgroundColor: Colors.light.backgroundCard,
     borderBottomWidth: 1,
     borderBottomColor: Colors.light.border,

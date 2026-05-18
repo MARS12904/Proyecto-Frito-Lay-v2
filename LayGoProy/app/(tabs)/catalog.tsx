@@ -20,6 +20,7 @@ import { useCart } from '../../contexts/CartContext';
 import { useStock } from '../../contexts/StockContext';
 import { getProductsByCategory, Product, productCategories, products as localProducts, searchProducts } from '../../data/products';
 import { productsService } from '../../services/productsService';
+import { useResponsive } from '../../hooks/useResponsive';
 
 export default function CatalogScreen() {
   return <CatalogContent />;
@@ -38,6 +39,7 @@ function CatalogContent() {
   
   const { addToCart, isInCart, isWholesaleMode, updateQuantity } = useCart();
   const { getProductStock, isProductAvailable, reduceStock } = useStock();
+  const { headerPaddingTop, scaleFont } = useResponsive();
 
   // Cargar productos desde Supabase
   const loadProducts = useCallback(async () => {
@@ -257,9 +259,7 @@ function CatalogContent() {
                 <Text style={styles.originalPrice}>S/ {item.price.toFixed(2)}</Text>
               )}
             </View>
-            <Text style={styles.productStock}>
-              Stock: {productStock}
-            </Text>
+            <Text style={styles.productStock}>Stock: {productStock}</Text>
           </View>
 
 
@@ -305,8 +305,10 @@ function CatalogContent() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Catálogo Frito-Lay</Text>
+      <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
+        <Text style={[styles.title, { fontSize: scaleFont(24) }]} numberOfLines={1}>
+          Catálogo Frito-Lay
+        </Text>
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color={Colors.light.textSecondary} style={styles.searchIcon} />
           <TextInput
@@ -454,7 +456,6 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: Colors.light.backgroundCard,
     padding: Spacing.lg,
-    paddingTop: Spacing.xxl,
     ...Shadows.sm,
   },
   title: {
@@ -614,14 +615,14 @@ const styles = StyleSheet.create({
     color: Colors.light.textSecondary,
   },
   productFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: Spacing.sm,
+    gap: Spacing.xs,
   },
   priceContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    gap: Spacing.xs,
   },
   productPrice: {
     fontSize: FontSizes.lg,
@@ -632,11 +633,11 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     color: Colors.light.textLight,
     textDecorationLine: 'line-through',
-    marginLeft: Spacing.xs,
   },
   productStock: {
     fontSize: FontSizes.xs,
     color: Colors.light.textSecondary,
+    marginTop: 2,
   },
   addButton: {
     flexDirection: 'row',
