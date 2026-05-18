@@ -25,6 +25,20 @@ export default function ProfileLayout() {
           title: 'Cambiar Contraseña'
         }} 
       />
+      <Stack.Screen
+        name="delivery-addresses"
+        options={{
+          headerShown: false,
+          title: 'Direcciones',
+        }}
+      />
+      <Stack.Screen
+        name="payment-methods"
+        options={{
+          headerShown: false,
+          title: 'Métodos de pago',
+        }}
+      />
     </Stack>
   );
 }

@@ -96,12 +96,10 @@ components/                # Componentes reutilizables
    npm start
    ```
 
-## 🔐 Credenciales de Prueba
+## Credenciales de prueba (modo local sin Supabase)
 
-Para probar la aplicación, puedes usar estas credenciales:
-
-- **Email:** admin@test.com
-- **Contraseña:** 123456
+- **Email:** comerciante1@test.com
+- **Contraseña:** comerciante123
 
 ## 📋 Funcionalidades por Módulo
 

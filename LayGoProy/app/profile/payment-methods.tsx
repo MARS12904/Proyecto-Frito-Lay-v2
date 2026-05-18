@@ -7,16 +7,22 @@ import {
   ScrollView,
   Alert,
   TextInput,
-  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
+import { FormSheetModal } from '../../components/ui/FormSheetModal';
+import { AppButton } from '../../components/ui/AppButton';
+import { ActionRow, ActionRowGroup } from '../../components/ui/ActionRow';
+import { useResponsive } from '../../hooks/useResponsive';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '../../constants/theme';
 import { PaymentMethod } from '../../data/userStorage';
 
 export default function PaymentMethodsScreen() {
   const { user, updateProfile } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { horizontalPadding, scaleFont, contentMaxWidth } = useResponsive();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(user?.paymentMethods || []);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
@@ -312,17 +318,26 @@ export default function PaymentMethodsScreen() {
     }
   };
 
+  const closeModal = () => {
+    setShowAddModal(false);
+    setEditingMethod(null);
+    resetForm();
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.light.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Métodos de Pago</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Métodos de pago" />
 
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={{
+          paddingHorizontal: horizontalPadding,
+          paddingBottom: insets.bottom + 100,
+          maxWidth: contentMaxWidth,
+          alignSelf: 'center',
+          width: '100%',
+        }}
+      >
         {paymentMethods.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="card-outline" size={64} color={Colors.light.textLight} />
@@ -360,162 +375,147 @@ export default function PaymentMethodsScreen() {
                   </View>
                 )}
               </View>
-              <View style={styles.methodActions}>
+              <ActionRowGroup>
                 {!method.isDefault && (
-                  <TouchableOpacity
-                    style={styles.actionButton}
+                  <ActionRow
+                    icon="star-outline"
+                    label="Predeterminado"
                     onPress={() => handleSetDefault(method.id)}
-                  >
-                    <Ionicons name="star-outline" size={18} color={Colors.light.primary} />
-                    <Text style={styles.actionButtonText}>Establecer como predeterminado</Text>
-                  </TouchableOpacity>
+                    color={Colors.light.primary}
+                  />
                 )}
-                <TouchableOpacity
-                  style={styles.actionButton}
+                <ActionRow
+                  icon="create-outline"
+                  label="Editar"
                   onPress={() => handleEdit(method)}
-                >
-                  <Ionicons name="create-outline" size={18} color={Colors.light.secondary} />
-                  <Text style={styles.actionButtonText}>Editar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionButton}
+                  color={Colors.light.secondary}
+                />
+                <ActionRow
+                  icon="trash-outline"
+                  label="Eliminar"
                   onPress={() => handleDelete(method.id)}
-                >
-                  <Ionicons name="trash-outline" size={18} color={Colors.light.error} />
-                  <Text style={[styles.actionButtonText, { color: Colors.light.error }]}>Eliminar</Text>
-                </TouchableOpacity>
-              </View>
+                  color={Colors.light.error}
+                />
+              </ActionRowGroup>
             </View>
           ))
         )}
       </ScrollView>
 
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => {
-          resetForm();
-          setEditingMethod(null);
-          setShowAddModal(true);
-        }}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.md, paddingHorizontal: horizontalPadding }]}>
+        <AppButton
+          label="Agregar método de pago"
+          onPress={() => {
+            resetForm();
+            setEditingMethod(null);
+            setShowAddModal(true);
+          }}
+          icon={<Ionicons name="add" size={22} color={Colors.light.background} />}
+        />
+      </View>
+
+      <FormSheetModal
+        visible={showAddModal}
+        title={editingMethod ? 'Editar método' : 'Nuevo método de pago'}
+        onClose={closeModal}
       >
-        <Ionicons name="add" size={24} color={Colors.light.background} />
-        <Text style={styles.addButtonText}>Agregar Método de Pago</Text>
-      </TouchableOpacity>
-
-      {/* Modal para agregar/editar */}
-      <Modal visible={showAddModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingMethod ? 'Editar' : 'Agregar'} Método de Pago
-              </Text>
-              <TouchableOpacity onPress={() => {
-                setShowAddModal(false);
-                setEditingMethod(null);
-                resetForm();
-              }}>
-                <Ionicons name="close" size={24} color={Colors.light.text} />
+        <View style={styles.inputGroup}>
+          <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Tipo de pago</Text>
+          <View style={styles.typeButtons}>
+            {(['card', 'transfer', 'credit', 'cash'] as const).map((type) => (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.typeButton,
+                  formData.type === type && styles.typeButtonActive,
+                ]}
+                onPress={() => setFormData({ ...formData, type })}
+              >
+                <Text
+                  style={[
+                    styles.typeButtonText,
+                    { fontSize: scaleFont(12) },
+                    formData.type === type && styles.typeButtonTextActive,
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  {type === 'card'
+                    ? 'Tarjeta'
+                    : type === 'transfer'
+                      ? 'Transferencia'
+                      : type === 'credit'
+                        ? 'Crédito'
+                        : 'Efectivo'}
+                </Text>
               </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Tipo de Pago</Text>
-                <View style={styles.typeButtons}>
-                  {['card', 'transfer', 'credit', 'cash'].map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.typeButton,
-                        formData.type === type && styles.typeButtonActive,
-                      ]}
-                      onPress={() => setFormData({ ...formData, type: type as any })}
-                    >
-                      <Text
-                        style={[
-                          styles.typeButtonText,
-                          formData.type === type && styles.typeButtonTextActive,
-                        ]}
-                      >
-                        {type === 'card' ? 'Tarjeta' :
-                         type === 'transfer' ? 'Transferencia' :
-                         type === 'credit' ? 'Crédito' :
-                         'Efectivo'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Nombre *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.name}
-                  onChangeText={(text) => setFormData({ ...formData, name: text })}
-                  placeholder="Ej: Tarjeta Principal"
-                />
-              </View>
-
-              {formData.type === 'card' && (
-                <>
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Número de Tarjeta *</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={formData.cardNumber}
-                      onChangeText={(text) => setFormData({ ...formData, cardNumber: text })}
-                      placeholder="1234 5678 9012 3456"
-                      keyboardType="numeric"
-                      maxLength={19}
-                    />
-                  </View>
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Fecha de Vencimiento *</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={formData.expiryDate}
-                      onChangeText={(text) => setFormData({ ...formData, expiryDate: text })}
-                      placeholder="MM/AA"
-                      keyboardType="numeric"
-                      maxLength={5}
-                    />
-                  </View>
-                </>
-              )}
-
-              {formData.type === 'transfer' && (
-                <>
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Banco *</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={formData.bank}
-                      onChangeText={(text) => setFormData({ ...formData, bank: text })}
-                      placeholder="Ej: Banco de Crédito del Perú"
-                    />
-                  </View>
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Número de Cuenta *</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={formData.accountNumber}
-                      onChangeText={(text) => setFormData({ ...formData, accountNumber: text })}
-                      placeholder="Número de cuenta"
-                      keyboardType="numeric"
-                    />
-                  </View>
-                </>
-              )}
-
-              <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                <Text style={styles.saveButtonText}>Guardar</Text>
-              </TouchableOpacity>
-            </ScrollView>
+            ))}
           </View>
         </View>
-      </Modal>
+
+        <View style={styles.inputGroup}>
+          <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Nombre *</Text>
+          <TextInput
+            style={styles.input}
+            value={formData.name}
+            onChangeText={(text) => setFormData({ ...formData, name: text })}
+            placeholder="Ej: Tarjeta principal"
+          />
+        </View>
+
+        {formData.type === 'card' && (
+          <>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Número de tarjeta *</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.cardNumber}
+                onChangeText={(text) => setFormData({ ...formData, cardNumber: text })}
+                placeholder="1234 5678 9012 3456"
+                keyboardType="numeric"
+                maxLength={19}
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Vencimiento *</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.expiryDate}
+                onChangeText={(text) => setFormData({ ...formData, expiryDate: text })}
+                placeholder="MM/AA"
+                keyboardType="numeric"
+                maxLength={5}
+              />
+            </View>
+          </>
+        )}
+
+        {formData.type === 'transfer' && (
+          <>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Banco *</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.bank}
+                onChangeText={(text) => setFormData({ ...formData, bank: text })}
+                placeholder="Ej: BCP"
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Número de cuenta *</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.accountNumber}
+                onChangeText={(text) => setFormData({ ...formData, accountNumber: text })}
+                placeholder="Número de cuenta"
+                keyboardType="numeric"
+              />
+            </View>
+          </>
+        )}
+
+        <AppButton label="Guardar" onPress={handleSave} />
+      </FormSheetModal>
     </View>
   );
 }
@@ -525,23 +525,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.light.backgroundSecondary,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.lg,
-    paddingTop: 50,
-    backgroundColor: Colors.light.backgroundCard,
-    ...Shadows.sm,
-  },
-  headerTitle: {
-    fontSize: FontSizes.xl,
-    fontWeight: 'bold',
-    color: Colors.light.text,
-  },
   content: {
     flex: 1,
-    padding: Spacing.lg,
+  },
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: Colors.light.backgroundCard,
+    borderTopWidth: 1,
+    borderTopColor: Colors.light.border,
+    paddingTop: Spacing.md,
+    ...Shadows.md,
   },
   emptyState: {
     alignItems: 'center',
@@ -606,67 +602,6 @@ const styles = StyleSheet.create({
     color: Colors.light.background,
     fontWeight: '600',
   },
-  methodActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.sm,
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: BorderRadius.md,
-    marginRight: Spacing.sm,
-  },
-  actionButtonText: {
-    fontSize: FontSizes.sm,
-    color: Colors.light.text,
-    marginLeft: Spacing.xs,
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.light.primary,
-    padding: Spacing.lg,
-    margin: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    ...Shadows.md,
-  },
-  addButtonText: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-    color: Colors.light.background,
-    marginLeft: Spacing.sm,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: Colors.light.backgroundCard,
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  modalTitle: {
-    fontSize: FontSizes.xl,
-    fontWeight: 'bold',
-    color: Colors.light.text,
-  },
-  modalBody: {
-    padding: Spacing.lg,
-  },
   inputGroup: {
     marginBottom: Spacing.lg,
   },
@@ -691,36 +626,29 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   typeButton: {
-    paddingHorizontal: Spacing.md,
+    flexGrow: 1,
+    flexBasis: '45%',
+    minWidth: 100,
+    paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: Colors.light.border,
     backgroundColor: Colors.light.background,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   typeButtonActive: {
     borderColor: Colors.light.primary,
     backgroundColor: Colors.light.primary,
   },
   typeButtonText: {
-    fontSize: FontSizes.sm,
     color: Colors.light.text,
+    textAlign: 'center',
   },
   typeButtonTextActive: {
     color: Colors.light.background,
     fontWeight: '600',
-  },
-  saveButton: {
-    backgroundColor: Colors.light.primary,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-    marginTop: Spacing.lg,
-  },
-  saveButtonText: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-    color: Colors.light.background,
   },
 });
 

@@ -41,22 +41,23 @@
       ],
       "expo-secure-store",
       "expo-image-picker",
-      "expo-camera",
       "expo-local-authentication",
       [
         "expo-image-picker",
         {
           "photosPermission": "La app necesita acceso a tus fotos para que puedas seleccionar una imagen de perfil."
         }
-      ]
+      ],
+      "expo-web-browser",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
     "extra": {
-      "supabaseUrl": "https://abledixphpivpvcajhdt.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFibGVkaXhwaHBpdnB2Y2FqaGR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzMTM4NDcsImV4cCI6MjA3ODg4OTg0N30.w26vd6tMo0lMogtjeRgMOTk2bX_yLde0Lr3-qVGigUw"
+      "supabaseUrl": "https://dvvzgoweklbauzlzsjwa.supabase.co",
+      "supabaseAnonKey": "sb_publishable_hx76cW83uNDugTygun8Z5Q_UdD2Ea-w"
     }
   }
 }

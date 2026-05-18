@@ -26,7 +26,7 @@ export interface Order {
   wholesaleTotal: number;
   savings: number;
   items: OrderItem[];
-  trackingNumber?: string;
+  trackingNumber?: string; // legacy, ya no se genera en BD
   deliveryDate?: string;
   deliveryAddress?: string;
   deliveryAddressId?: string; // ID de la dirección en delivery_addresses
@@ -121,16 +121,15 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       supabase.removeChannel(channelRef.current);
     }
 
-    // Crear nueva suscripción para cambios en delivery_orders del usuario
     const channel = supabase
       .channel(`orders-${user.id}`)
       .on(
         'postgres_changes',
         {
-          event: '*', // Escuchar INSERT, UPDATE, DELETE
+          event: '*',
           schema: 'public',
-          table: 'delivery_orders',
-          filter: `created_by=eq.${user.id}`,
+          table: 'orders',
+          filter: `user_id=eq.${user.id}`,
         },
         async (payload) => {
           console.log('📦 Cambio en pedido detectado:', payload.eventType);

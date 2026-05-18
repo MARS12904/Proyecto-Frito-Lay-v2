@@ -1,5 +1,12 @@
 {
-  "dependencies": {
-    "recharts": "^3.4.1"
+  "name": "frito-lay-comerciante",
+  "private": true,
+  "description": "App comerciante Frito Lay - monorepo simplificado",
+  "scripts": {
+    "start": "npm run start --prefix LayGoProy",
+    "android": "npm run android --prefix LayGoProy",
+    "ios": "npm run ios --prefix LayGoProy",
+    "web": "npm run web --prefix LayGoProy",
+    "lint": "npm run lint --prefix LayGoProy"
   }
 }

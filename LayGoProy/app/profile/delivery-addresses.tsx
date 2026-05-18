@@ -7,11 +7,15 @@ import {
   ScrollView,
   Alert,
   TextInput,
-  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
+import { FormSheetModal } from '../../components/ui/FormSheetModal';
+import { AppButton } from '../../components/ui/AppButton';
+import { ActionRow, ActionRowGroup } from '../../components/ui/ActionRow';
+import { useResponsive } from '../../hooks/useResponsive';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '../../constants/theme';
 import { DeliveryAddress } from '../../data/userStorage';
 
@@ -26,6 +30,8 @@ const deliveryAreas = [
 
 export default function DeliveryAddressesScreen() {
   const { user, updateProfile } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { horizontalPadding, scaleFont, contentMaxWidth } = useResponsive();
   const [addresses, setAddresses] = useState<DeliveryAddress[]>(user?.deliveryAddresses || []);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState<DeliveryAddress | null>(null);
@@ -293,17 +299,26 @@ export default function DeliveryAddressesScreen() {
     return deliveryAreas.find(area => area.id === zoneId)?.fee || 0;
   };
 
+  const closeModal = () => {
+    setShowAddModal(false);
+    setEditingAddress(null);
+    resetForm();
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.light.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Direcciones de Entrega</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <ScreenHeader title="Direcciones de entrega" />
 
-      <ScrollView style={styles.content}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={{
+          paddingHorizontal: horizontalPadding,
+          paddingBottom: insets.bottom + 100,
+          maxWidth: contentMaxWidth,
+          alignSelf: 'center',
+          width: '100%',
+        }}
+      >
         {addresses.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="location-outline" size={64} color={Colors.light.textLight} />
@@ -334,122 +349,103 @@ export default function DeliveryAddressesScreen() {
                   </View>
                 )}
               </View>
-              <View style={styles.addressActions}>
+              <ActionRowGroup>
                 {!address.isDefault && (
-                  <TouchableOpacity
-                    style={styles.actionButton}
+                  <ActionRow
+                    icon="star-outline"
+                    label="Predeterminada"
                     onPress={() => handleSetDefault(address.id)}
-                  >
-                    <Ionicons name="star-outline" size={18} color={Colors.light.primary} />
-                    <Text style={styles.actionButtonText}>Establecer como predeterminada</Text>
-                  </TouchableOpacity>
+                    color={Colors.light.primary}
+                  />
                 )}
-                <TouchableOpacity
-                  style={styles.actionButton}
+                <ActionRow
+                  icon="create-outline"
+                  label="Editar"
                   onPress={() => handleEdit(address)}
-                >
-                  <Ionicons name="create-outline" size={18} color={Colors.light.secondary} />
-                  <Text style={styles.actionButtonText}>Editar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionButton}
+                  color={Colors.light.secondary}
+                />
+                <ActionRow
+                  icon="trash-outline"
+                  label="Eliminar"
                   onPress={() => handleDelete(address.id)}
-                >
-                  <Ionicons name="trash-outline" size={18} color={Colors.light.error} />
-                  <Text style={[styles.actionButtonText, { color: Colors.light.error }]}>Eliminar</Text>
-                </TouchableOpacity>
-              </View>
+                  color={Colors.light.error}
+                />
+              </ActionRowGroup>
             </View>
           ))
         )}
       </ScrollView>
 
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => {
-          resetForm();
-          setEditingAddress(null);
-          setShowAddModal(true);
-        }}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.md, paddingHorizontal: horizontalPadding }]}>
+        <AppButton
+          label="Agregar dirección"
+          onPress={() => {
+            resetForm();
+            setEditingAddress(null);
+            setShowAddModal(true);
+          }}
+          icon={<Ionicons name="add" size={22} color={Colors.light.background} />}
+        />
+      </View>
+
+      <FormSheetModal
+        visible={showAddModal}
+        title={editingAddress ? 'Editar dirección' : 'Nueva dirección'}
+        onClose={closeModal}
       >
-        <Ionicons name="add" size={24} color={Colors.light.background} />
-        <Text style={styles.addButtonText}>Agregar Dirección</Text>
-      </TouchableOpacity>
-
-      {/* Modal para agregar/editar */}
-      <Modal visible={showAddModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingAddress ? 'Editar' : 'Agregar'} Dirección
-              </Text>
-              <TouchableOpacity onPress={() => {
-                setShowAddModal(false);
-                setEditingAddress(null);
-                resetForm();
-              }}>
-                <Ionicons name="close" size={24} color={Colors.light.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Zona de Entrega *</Text>
-                <View style={styles.zoneButtons}>
-                  {deliveryAreas.map((area) => (
-                    <TouchableOpacity
-                      key={area.id}
-                      style={[
-                        styles.zoneButton,
-                        formData.zone === area.id && styles.zoneButtonActive,
-                      ]}
-                      onPress={() => setFormData({ ...formData, zone: area.id })}
-                    >
-                      <Text
-                        style={[
-                          styles.zoneButtonText,
-                          formData.zone === area.id && styles.zoneButtonTextActive,
-                        ]}
-                      >
-                        {area.name} {area.fee === 0 ? '(Gratis)' : `(+S/ ${area.fee})`}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Dirección Completa *</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={formData.address}
-                  onChangeText={(text) => setFormData({ ...formData, address: text })}
-                  placeholder="Ej: Av. Arequipa 123, Miraflores, Lima"
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Notas Adicionales (opcional)</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={formData.notes}
-                  onChangeText={(text) => setFormData({ ...formData, notes: text })}
-                  placeholder="Instrucciones especiales para la entrega..."
-                  multiline
+        <View style={styles.inputGroup}>
+          <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Zona de entrega *</Text>
+          <View style={styles.zoneButtons}>
+            {deliveryAreas.map((area) => (
+              <TouchableOpacity
+                key={area.id}
+                style={[
+                  styles.zoneButton,
+                  formData.zone === area.id && styles.zoneButtonActive,
+                ]}
+                onPress={() => setFormData({ ...formData, zone: area.id })}
+              >
+                <Text
+                  style={[
+                    styles.zoneButtonText,
+                    { fontSize: scaleFont(13) },
+                    formData.zone === area.id && styles.zoneButtonTextActive,
+                  ]}
                   numberOfLines={2}
-                />
-              </View>
-
-              <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                <Text style={styles.saveButtonText}>Guardar</Text>
+                >
+                  {area.name} {area.fee === 0 ? '(Gratis)' : `(+S/ ${area.fee})`}
+                </Text>
               </TouchableOpacity>
-            </ScrollView>
+            ))}
           </View>
         </View>
-      </Modal>
+
+        <View style={styles.inputGroup}>
+          <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Dirección completa *</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={formData.address}
+            onChangeText={(text) => setFormData({ ...formData, address: text })}
+            placeholder="Ej: Av. Arequipa 123, Miraflores, Lima"
+            multiline
+            numberOfLines={3}
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Notas (opcional)</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={formData.notes}
+            onChangeText={(text) => setFormData({ ...formData, notes: text })}
+            placeholder="Instrucciones para la entrega..."
+            multiline
+            numberOfLines={2}
+          />
+        </View>
+
+        <AppButton label="Guardar" onPress={handleSave} />
+      </FormSheetModal>
     </View>
   );
 }
@@ -459,23 +455,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.light.backgroundSecondary,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.lg,
-    paddingTop: 50,
-    backgroundColor: Colors.light.backgroundCard,
-    ...Shadows.sm,
-  },
-  headerTitle: {
-    fontSize: FontSizes.xl,
-    fontWeight: 'bold',
-    color: Colors.light.text,
-  },
   content: {
     flex: 1,
-    padding: Spacing.lg,
+  },
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: Colors.light.backgroundCard,
+    borderTopWidth: 1,
+    borderTopColor: Colors.light.border,
+    paddingTop: Spacing.md,
+    ...Shadows.md,
   },
   emptyState: {
     alignItems: 'center',
@@ -513,12 +505,14 @@ const styles = StyleSheet.create({
   addressDetails: {
     marginLeft: Spacing.md,
     flex: 1,
+    minWidth: 0,
   },
   addressText: {
     fontSize: FontSizes.md,
     fontWeight: '600',
     color: Colors.light.text,
     marginBottom: Spacing.xs,
+    flexShrink: 1,
   },
   zoneText: {
     fontSize: FontSizes.sm,
@@ -540,67 +534,6 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
     color: Colors.light.background,
     fontWeight: '600',
-  },
-  addressActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.sm,
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: BorderRadius.md,
-    marginRight: Spacing.sm,
-  },
-  actionButtonText: {
-    fontSize: FontSizes.sm,
-    color: Colors.light.text,
-    marginLeft: Spacing.xs,
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.light.primary,
-    padding: Spacing.lg,
-    margin: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    ...Shadows.md,
-  },
-  addButtonText: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-    color: Colors.light.background,
-    marginLeft: Spacing.sm,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: Colors.light.backgroundCard,
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  modalTitle: {
-    fontSize: FontSizes.xl,
-    fontWeight: 'bold',
-    color: Colors.light.text,
-  },
-  modalBody: {
-    padding: Spacing.lg,
   },
   inputGroup: {
     marginBottom: Spacing.lg,
@@ -639,24 +572,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.primary,
   },
   zoneButtonText: {
-    fontSize: FontSizes.sm,
     color: Colors.light.text,
+    flexShrink: 1,
   },
   zoneButtonTextActive: {
     color: Colors.light.background,
     fontWeight: '600',
-  },
-  saveButton: {
-    backgroundColor: Colors.light.primary,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-    marginTop: Spacing.lg,
-  },
-  saveButtonText: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-    color: Colors.light.background,
   },
 });
 

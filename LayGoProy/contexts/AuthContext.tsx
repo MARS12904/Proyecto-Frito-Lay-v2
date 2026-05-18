@@ -83,6 +83,54 @@ const deleteSecureItem = async (key: string): Promise<void> => {
   }
 };
 
+const saveBiometricCredentials = async (email: string, password: string): Promise<void> => {
+  if (Platform.OS === 'web') return;
+  await setSecureItem('biometricEmail', email.toLowerCase().trim());
+  await setSecureItem('biometricPassword', password);
+};
+
+type AuthErrorLike = { message?: string; status?: number };
+
+/** Errores de Supabase Auth que no deben usar modo local */
+const handleKnownSupabaseAuthError = (error: AuthErrorLike, context: 'login' | 'register'): boolean => {
+  const msg = (error.message || '').toLowerCase();
+  const status = error.status;
+
+  if (msg.includes('email not confirmed') || msg.includes('email_not_confirmed')) {
+    Alert.alert(
+      'Correo sin confirmar',
+      'Debes confirmar tu email antes de iniciar sesión.\n\n' +
+        '1. Revisa tu bandeja (y spam).\n' +
+        '2. O en Supabase: Authentication → Users → tu usuario → Confirm user.\n' +
+        '3. En desarrollo puedes desactivar "Confirm email" en Authentication → Providers → Email.'
+    );
+    return true;
+  }
+
+  if (status === 429 || msg.includes('rate limit')) {
+    Alert.alert(
+      'Demasiados intentos',
+      'Supabase limitó el envío de correos (error 429).\n\n' +
+        'Espera unos minutos y no vuelvas a registrarte.\n' +
+        'Si ya tienes cuenta, confirma el email e inicia sesión.\n\n' +
+        'En desarrollo: desactiva "Confirm email" en Supabase para evitar este límite.'
+    );
+    return true;
+  }
+
+  if (context === 'register' && (msg.includes('already registered') || msg.includes('already exists'))) {
+    Alert.alert('Cuenta existente', 'Este email ya está registrado. Inicia sesión o confirma tu correo si aún no lo hiciste.');
+    return true;
+  }
+
+  if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
+    Alert.alert('Credenciales incorrectas', 'Email o contraseña incorrectos.');
+    return true;
+  }
+
+  return false;
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
@@ -264,8 +312,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (authError) {
             console.error('Supabase login error:', authError);
-            // Fallback a sistema local si falla Supabase
-            return await loginLocal(email, password);
+            if (handleKnownSupabaseAuthError(authError, 'login')) {
+              return false;
+            }
+            Alert.alert('Error al iniciar sesión', authError.message || 'No se pudo iniciar sesión.');
+            return false;
           }
 
           if (authData?.user) {
@@ -277,23 +328,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               .single() as any);
 
             if (profileError) {
-              console.error('Error fetching profile:', profileError);
-              // Si no hay perfil, crear uno básico (usar 'as any' para evitar errores de tipos)
-              const { data: newProfile, error: createError } = await (supabase
-                .from('user_profiles')
-                .insert({
-                  id: authData.user.id,
-                  email: authData.user.email || email,
-                  name: authData.user.user_metadata?.name || email.split('@')[0],
-                  role: authData.user.user_metadata?.role || 'comerciante',
-                  is_active: true,
-                } as any)
-                .select()
-                .single() as any);
+              console.warn('Perfil no encontrado, intentando ensure_user_profile...');
+              const { data: rpcRows, error: rpcError } = await (supabase as any).rpc(
+                'ensure_user_profile',
+                {
+                  p_name: authData.user.user_metadata?.name || email.split('@')[0],
+                  p_phone: null,
+                }
+              );
 
-              if (createError || !newProfile) {
-                console.error('Error creating profile:', createError);
-                return await loginLocal(email, password);
+              let newProfile = Array.isArray(rpcRows) ? rpcRows[0] : rpcRows;
+
+              if (rpcError || !newProfile) {
+                const { data: inserted, error: createError } = await supabase
+                  .from('user_profiles')
+                  .insert({
+                    id: authData.user.id,
+                    email: authData.user.email || email,
+                    name: authData.user.user_metadata?.name || email.split('@')[0],
+                    is_active: true,
+                  } as any)
+                  .select()
+                  .single();
+
+                if (createError || !inserted) {
+                  console.error('Error creating profile:', createError || rpcError);
+                  return await loginLocal(email, password);
+                }
+                newProfile = inserted;
               }
 
               // Cargar direcciones desde la tabla delivery_addresses
@@ -354,6 +416,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               };
               await UserStorage.setCurrentUser(storedUser as any);
               setUser(user);
+              await saveBiometricCredentials(email, password);
               return true;
             }
 
@@ -416,6 +479,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             };
             await UserStorage.setCurrentUser(storedUser as any);
             setUser(user);
+            await saveBiometricCredentials(email, password);
             return true;
           }
         } catch (supabaseError) {
@@ -446,6 +510,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await UserStorage.setCurrentUser(storedUser);
         await AsyncStorage.setItem('currentUserId', storedUser.id);
         setUser(storedUser);
+        await saveBiometricCredentials(email, password);
         return true;
       }
       
@@ -472,7 +537,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             options: {
               data: {
                 name: userData.name,
-                role: 'comerciante',
               },
             },
           });
@@ -484,112 +548,96 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               name: authError.name,
               error: authError,
             });
-            
-            // Si el error es que el email ya existe, intentar login
-            if (
-              authError.message.includes('already registered') || 
-              authError.message.includes('already exists') ||
-              authError.message.includes('User already registered')
-            ) {
-              Alert.alert('Error', 'Este email ya está registrado. Por favor inicia sesión.');
+
+            if (handleKnownSupabaseAuthError(authError, 'register')) {
               return false;
             }
-            
-            // Si es un error de base de datos, mostrar mensaje más específico
+
             if (authError.message.includes('Database error')) {
               Alert.alert(
-                'Error de Base de Datos', 
-                'Hubo un problema al crear el usuario. Por favor verifica que el trigger esté configurado correctamente en Supabase.\n\n' +
-                'Error: ' + authError.message
+                'Error de base de datos',
+                'Problema al crear el usuario. Ejecuta scripts/fix-user-profiles-rls.sql en Supabase.\n\n' +
+                  authError.message
               );
-              console.error('Database error details:', authError);
-              // Intentar crear el perfil manualmente si el usuario se creó
-              // (esto se maneja más abajo)
+              return false;
             }
-            
-            // Fallback a sistema local si falla Supabase
-            return await registerLocal(userData);
+
+            Alert.alert('Error al registrarse', authError.message || 'No se pudo completar el registro.');
+            return false;
           }
 
           if (authData?.user) {
             console.log('Usuario creado en Supabase Auth:', authData.user.id);
-            
-            // El perfil se crea automáticamente por el trigger, pero verificamos
-            // Esperar un momento para que el trigger se ejecute
-            await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Verificar si el perfil fue creado (intentar varias veces)
+            const { data: sessionData } = await supabase.auth.getSession();
+            const hasSession = !!sessionData?.session;
+
+            if (!hasSession) {
+              Alert.alert(
+                'Confirma tu correo',
+                'Te enviamos un enlace de confirmación. Ábrelo y luego inicia sesión para completar tu perfil.'
+              );
+              return true;
+            }
+
             let profile: any = null;
-            let attempts = 0;
-            const maxAttempts = 3;
 
-            while (attempts < maxAttempts && !profile) {
-              const result: any = await (supabase
+            const ensureProfile = async (): Promise<any> => {
+              const { data, error } = await (supabase as any).rpc('ensure_user_profile', {
+                p_name: userData.name.trim(),
+                p_phone: userData.phone?.trim() || null,
+              });
+              if (error) {
+                console.warn('ensure_user_profile:', error.message);
+                return null;
+              }
+              return Array.isArray(data) ? data[0] : data;
+            };
+
+            for (let attempt = 0; attempt < 3 && !profile; attempt++) {
+              const result: any = await supabase
                 .from('user_profiles')
                 .select('*')
                 .eq('id', authData.user.id)
-                .single() as any);
+                .maybeSingle();
 
               profile = result.data;
-              // Log error si existe
-              if (result.error) {
-                console.warn('Error fetching profile (attempt', attempts + 1, '):', result.error);
-              }
+              if (profile) break;
 
-              if (profile) {
-                console.log('Perfil encontrado después de', attempts + 1, 'intentos');
-                break;
+              if (attempt < 2) {
+                await new Promise((resolve) => setTimeout(resolve, 400));
               }
-
-              if (attempts < maxAttempts - 1) {
-                console.log('Perfil no encontrado, esperando... (intento', attempts + 1, 'de', maxAttempts + ')');
-                await new Promise(resolve => setTimeout(resolve, 500));
-              }
-
-              attempts++;
             }
 
             if (!profile) {
-              console.warn('El trigger no creó el perfil, creando manualmente...');
-              // Si el trigger no funcionó, crear el perfil manualmente
-              // Asegurarse de que el role sea exactamente 'comerciante' (sin espacios, minúsculas)
-              const roleValue = 'comerciante'; // Valor exacto que cumple con el constraint
-              
-              const { data: newProfile, error: createError } = await (supabase
+              profile = await ensureProfile();
+            }
+
+            if (!profile) {
+              const { data: newProfile, error: createError } = await supabase
                 .from('user_profiles')
                 .insert({
                   id: authData.user.id,
                   email: (authData.user.email || userData.email).toLowerCase().trim(),
                   name: userData.name.trim(),
                   phone: userData.phone?.trim() || null,
-                  role: roleValue, // Asegurar que sea exactamente 'comerciante'
                   is_active: true,
                   preferences: userData.preferences || { notifications: true, theme: 'auto' },
                 } as any)
                 .select()
-                .single() as any);
+                .single();
 
               if (createError || !newProfile) {
-                console.error('Error creating profile manually:', {
-                  error: createError,
-                  message: createError?.message,
-                  details: createError?.details,
-                  hint: createError?.hint,
-                });
-                
+                console.error('Error creating profile:', createError);
                 Alert.alert(
                   'Error al crear perfil',
-                  'El usuario se creó pero no se pudo crear el perfil. Por favor contacta al soporte.\n\n' +
-                  'Error: ' + (createError?.message || 'Error desconocido')
+                  'Tu cuenta se creó en Auth pero falta el perfil en la base de datos.\n\n' +
+                    'En Supabase ejecuta el script: scripts/fix-user-profiles-rls.sql\n\n' +
+                    (createError?.message || '')
                 );
-                
-                // No eliminar el usuario de auth, puede ser recuperado después
-                // await supabase.auth.admin?.deleteUser(authData.user.id).catch(() => {});
                 return false;
               }
-
               profile = newProfile;
-              console.log('Perfil creado manualmente exitosamente');
             }
 
             console.log('Usuario registrado exitosamente en Supabase:', authData.user.email);
@@ -599,12 +647,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return false;
         } catch (supabaseError) {
           console.error('Error in Supabase registration:', supabaseError);
-          // Fallback a sistema local
-          return await registerLocal(userData);
+          Alert.alert('Error', 'No se pudo conectar con Supabase. Revisa tu conexión e intenta de nuevo.');
+          return false;
         }
       }
 
-      // Fallback a sistema local si Supabase no está disponible
       return await registerLocal(userData);
     } catch (error) {
       console.error('Register error:', error);
@@ -839,8 +886,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       if (result.success) {
-        // Simular login automático con biometría
-        return await login('admin@test.com', '123456');
+        const savedEmail = await getSecureItem('biometricEmail');
+        const savedPassword = await getSecureItem('biometricPassword');
+        if (savedEmail && savedPassword) {
+          return await login(savedEmail, savedPassword);
+        }
       }
       
       return false;

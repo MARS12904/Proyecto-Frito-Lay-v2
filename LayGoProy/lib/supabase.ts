@@ -3,8 +3,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 // Obtener las variables de entorno
-let supabaseUrl: string | undefined = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL;
-let supabaseAnonKey: string | undefined = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+let supabaseUrl: string | undefined =
+  Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL;
+// Anon key: nombre estándar o alias usado en algunos .env
+let supabaseAnonKey: string | undefined =
+  Constants.expoConfig?.extra?.supabaseAnonKey ||
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.EXPO_PUBLIC_SUPABASE_KEY;
 
 // Limpiar y normalizar los valores (eliminar espacios, saltos de línea, etc.)
 if (supabaseUrl) {

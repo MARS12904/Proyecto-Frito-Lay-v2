@@ -10,7 +10,9 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '../constants/theme';
+import { useResponsive } from '../hooks/useResponsive';
 import { useAuth } from '../contexts/AuthContext';
 import { deliveryAddressesService } from '../services/deliveryAddressesService';
 import { DeliveryAddress } from '../data/userStorage';
@@ -70,6 +72,8 @@ export default function DeliveryScheduler({
   existingSchedule,
 }: DeliverySchedulerProps) {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { horizontalPadding, scaleFont } = useResponsive();
   const [selectedDate, setSelectedDate] = useState(
     existingSchedule?.date || new Date().toISOString().split('T')[0]
   );
@@ -697,41 +701,55 @@ export default function DeliveryScheduler({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View
+          style={[
+            styles.header,
+            { paddingTop: insets.top + Spacing.sm, paddingHorizontal: horizontalPadding },
+          ]}
+        >
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={24} color={Colors.light.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Programar Entrega</Text>
+          <Text
+            style={[styles.headerTitle, { fontSize: scaleFont(17) }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            Programar entrega
+          </Text>
           <View style={styles.stepIndicator}>
             <Text style={styles.stepIndicatorText}>{step}/{maxSteps}</Text>
           </View>
         </View>
 
-        <ScrollView style={styles.content}>
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={{ paddingHorizontal: horizontalPadding, paddingBottom: Spacing.lg }}
+        >
           {renderCurrentStep()}
         </ScrollView>
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.md, paddingHorizontal: horizontalPadding }]}>
           {step > 1 && (
             <TouchableOpacity style={styles.previousButton} onPress={handlePrevious}>
               <Ionicons name="chevron-back" size={20} color={Colors.light.primary} />
-              <Text style={styles.previousButtonText}>Anterior</Text>
+              <Text style={styles.previousButtonText} numberOfLines={1}>Anterior</Text>
             </TouchableOpacity>
           )}
           
           {step < maxSteps ? (
             <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-              <Text style={styles.nextButtonText}>Siguiente</Text>
+              <Text style={styles.nextButtonText} numberOfLines={1} adjustsFontSizeToFit>Siguiente</Text>
               <Ionicons name="chevron-forward" size={20} color={Colors.light.background} />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
               <Ionicons name="checkmark" size={20} color={Colors.light.background} />
-              <Text style={styles.confirmButtonText}>Confirmar Entrega</Text>
+              <Text style={styles.confirmButtonText} numberOfLines={1} adjustsFontSizeToFit>Confirmar</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -758,9 +776,12 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
   headerTitle: {
+    flex: 1,
     fontSize: FontSizes.lg,
     fontWeight: '600',
     color: Colors.light.text,
+    textAlign: 'center',
+    marginHorizontal: Spacing.xs,
   },
   stepIndicator: {
     backgroundColor: Colors.light.primary,
@@ -972,6 +993,7 @@ const styles = StyleSheet.create({
     color: Colors.light.background,
     fontSize: FontSizes.md,
     fontWeight: '600',
+    flexShrink: 1,
   },
   confirmButton: {
     flex: 1,
@@ -987,6 +1009,7 @@ const styles = StyleSheet.create({
     color: Colors.light.background,
     fontSize: FontSizes.md,
     fontWeight: '600',
+    flexShrink: 1,
   },
   loadingContainer: {
     padding: Spacing.xl,
