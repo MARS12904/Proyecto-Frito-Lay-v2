@@ -284,5 +284,5 @@ export const AppConfig = {
   description: 'Aplicación para comerciantes minoristas de Frito-Lay Perú',
   company: 'Frito-Lay Perú',
   supportEmail: 'soporte@fritolay.com.pe',
-  supportPhone: '+51 1 234-5678',
+  supportPhone: '+51 970 504 403',
 };

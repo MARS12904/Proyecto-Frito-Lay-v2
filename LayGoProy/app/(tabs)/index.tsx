@@ -1,561 +1,141 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState, useEffect } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
-import DeliveryScheduler from '../../components/DeliveryScheduler';
-import { ResponsiveCard, ResponsiveLayout } from '../../components/ResponsiveLayout';
-import { BorderRadius, Colors, Dimensions, FontSizes, Shadows, Spacing } from '../../constants/theme';
-import { useAuth } from '../../contexts/AuthContext';
-import { useCart } from '../../contexts/CartContext';
-import { useMetrics } from '../../contexts/MetricsContext';
-import { useOrders } from '../../contexts/OrdersContext';
-import { useResponsive } from '../../hooks/useResponsive';
-import { formatFirstName, formatOrderLabel } from '../../utils/format';
+import { router } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import CategoryScroller from '@/components/home/CategoryScroller';
+import ProductHorizontalList from '@/components/home/ProductHorizontalList';
+import PromoCarousel from '@/components/home/PromoCarousel';
+import { BorderRadius, FontSizes, Shadows, Spacing } from '@/constants/theme';
+import { homePromos, quickOffers } from '@/data/homeContent';
+import { Product, products as localProducts } from '@/data/products';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/contexts/CartContext';
+import { useAppColors } from '@/contexts/ThemeContext';
+import { useResponsive } from '@/hooks/useResponsive';
+import { productsService } from '@/services/productsService';
+import { formatFirstName } from '@/utils/format';
 
 export default function HomeScreen() {
-  return <HomeContent />;
-}
-
-function HomeContent() {
   const { user } = useAuth();
-  const { 
-    totalItems, 
-    totalPrice, 
-    wholesaleTotal, 
-    regularTotal, 
-    isWholesaleMode, 
-    toggleWholesaleMode,
-    getCartSummary,
-  } = useCart();
-  const { getUserMetrics, reloadMetrics } = useMetrics();
-  const { getOrdersByUser } = useOrders();
+  const { isWholesaleMode, toggleWholesaleMode } = useCart();
+  const colors = useAppColors();
+  const { headerPaddingTop } = useResponsive();
+  const [products, setProducts] = useState<Product[]>(localProducts);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [showDeliveryScheduler, setShowDeliveryScheduler] = useState(false);
-  const [lastOrder, setLastOrder] = useState<any>(null);
-  const cartSummary = getCartSummary();
-  const { headerPaddingTop, scaleFont } = useResponsive();
-
-  // Recargar métricas cuando el usuario cambia o cuando se monta el componente
-  useEffect(() => {
-    if (user?.id) {
-      reloadMetrics(user.id);
-    }
-  }, [user?.id]);
-
-  // Obtener el último pedido del usuario
-  useEffect(() => {
-    if (user) {
-      const userOrders = getOrdersByUser(user.id);
-      if (userOrders.length > 0) {
-        // Ordenar por fecha descendente y tomar el más reciente que tenga información de entrega
-        const sortedOrders = userOrders
-          .filter(order => order.deliveryAddress) // Solo pedidos con dirección
-          .sort((a, b) => {
-            const dateA = new Date(a.date).getTime();
-            const dateB = new Date(b.date).getTime();
-            return dateB - dateA;
-          });
-        setLastOrder(sortedOrders.length > 0 ? sortedOrders[0] : null);
-      } else {
-        setLastOrder(null);
-      }
+  const loadProducts = useCallback(async () => {
+    const remote = await productsService.getAllProducts();
+    if (remote.length >= localProducts.length) {
+      setProducts(remote);
     } else {
-      setLastOrder(null);
+      setProducts(localProducts);
     }
-  }, [user, getOrdersByUser]);
+  }, []);
 
-  // Obtener métricas del usuario
-  const merchantStats = user ? getUserMetrics(user.id) : {
-    totalOrders: 0,
-    totalSpent: 0,
-    totalSavings: 0,
-    averageOrderValue: 0,
-    monthlyGoal: 5000,
-    monthlyProgress: 0,
-  };
+  useEffect(() => { loadProducts(); }, [loadProducts]);
 
-  const handleWholesaleToggle = () => {
-    Alert.alert(
-      'Cambiar Modo de Compra',
-      isWholesaleMode 
-        ? '¿Cambiar a modo minorista? Perderás los precios mayoristas.'
-        : '¿Cambiar a modo mayorista? Obtendrás precios especiales para comerciantes.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Confirmar', onPress: toggleWholesaleMode }
-      ]
-    );
+  const newProducts = products.filter((p) => p.tags.includes('nuevo') || p.tags.includes('edicion-limitada')).slice(0, 8);
+  const promoProducts = products.filter((p) => p.promotion).slice(0, 8);
+  const featuredProducts = promoProducts.length > 0 ? promoProducts : products.slice(0, 8);
+  const bestSellers = [...products].sort((a, b) => b.stock - a.stock).slice(0, 8);
+
+  const goCatalog = (categoryId?: string) => {
+    router.push(categoryId ? `/(tabs)/catalog?category=${categoryId}` : '/(tabs)/catalog');
   };
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Header con branding Frito-Lay */}
-      <ResponsiveCard style={[styles.header, { paddingTop: headerPaddingTop }]} padding="lg">
-        <Text
-          style={[styles.brandLine, { fontSize: scaleFont(22) }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.8}
-        >
-          Frito-Lay <Text style={styles.brandAccent}>Comerciantes</Text>
-        </Text>
-        <Text style={[styles.welcomeText, { fontSize: scaleFont(16) }]} numberOfLines={1}>
-          ¡Hola, {formatFirstName(user?.name)}!
-        </Text>
-        <Text style={styles.subtitleText}>Tu plataforma de reabastecimiento</Text>
-      </ResponsiveCard>
-
-      {/* Modo de compra */}
-      <ResponsiveCard style={styles.modeContainer}>
-        <ResponsiveLayout direction="row" justify="space-between" align="center" gap="md">
-          <Text style={styles.modeTitle}>Modo de Compra</Text>
-          <Switch
-            value={isWholesaleMode}
-            onValueChange={handleWholesaleToggle}
-            trackColor={{ false: Colors.light.border, true: Colors.light.primary }}
-            thumbColor={isWholesaleMode ? Colors.light.accent : Colors.light.textLight}
-          />
-        </ResponsiveLayout>
-        <Text style={styles.modeDescription}>
-          {isWholesaleMode 
-            ? 'Precios mayoristas activos - Ideal para reabastecimiento de tienda'
-            : 'Precios minoristas - Para compras personales'
-          }
-        </Text>
-      </ResponsiveCard>      
-
-      {/* Dashboard de Negocio */}
-      <ResponsiveCard style={styles.dashboardCard} padding="lg">
-        <Text style={styles.sectionTitle}>Dashboard de Negocio</Text>
-        <View style={styles.dashboardStatsRow}>
-          <View style={styles.dashboardStat}>
-            <Ionicons name="receipt" size={Dimensions.isSmallScreen ? 20 : 24} color={Colors.light.primary} />
-            <Text style={styles.dashboardNumber} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              {merchantStats.totalOrders}
-            </Text>
-            <Text style={styles.dashboardLabel}>Pedidos</Text>
-          </View>
-          <View style={styles.dashboardStat}>
-            <Ionicons name="cash" size={Dimensions.isSmallScreen ? 20 : 24} color={Colors.light.success} />
-            <Text style={styles.dashboardNumber} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              S/ {merchantStats.totalSpent.toFixed(0)}
-            </Text>
-            <Text style={styles.dashboardLabel}>Gastado</Text>
-          </View>
-          <View style={styles.dashboardStat}>
-            <Ionicons name="trending-down" size={Dimensions.isSmallScreen ? 20 : 24} color={Colors.light.warning} />
-            <Text style={styles.dashboardNumber} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              S/ {merchantStats.totalSavings.toFixed(0)}
-            </Text>
-            <Text style={styles.dashboardLabel}>Ahorrado</Text>
-          </View>
-        </View>
-        {/* Progreso mensual */}
-        <View style={styles.monthlyProgress}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressTitle}>Meta Mensual</Text>
-            <Text style={styles.progressValue}>
-              S/ {merchantStats.monthlyProgress.toFixed(0)} / S/ {merchantStats.monthlyGoal.toFixed(0)}
-            </Text>
-          </View>
-          <View style={styles.progressBar}>
-            <View 
-              style={[
-                styles.progressFill, 
-                { width: `${Math.min((merchantStats.monthlyProgress / merchantStats.monthlyGoal) * 100, 100)}%` }
-              ]} 
-            />
-          </View>
-        </View>
-      </ResponsiveCard>
-
-      {/* Último Pedido - Información de Entrega */}
-      {isWholesaleMode && lastOrder && lastOrder.deliveryAddress && (
-        <View style={styles.deliveryContainer}>
-          <View style={styles.deliveryHeader}>
-            <Ionicons name="calendar" size={20} color={Colors.light.primary} />
-            <Text style={styles.deliveryTitle}>Último Pedido - Entrega Programada</Text>
-          </View>
-          <View style={styles.deliveryInfo}>
-            <View style={styles.orderInfoRow}>
-              <Text style={styles.orderLabel}>Pedido:</Text>
-              <Text style={styles.orderValue}>{formatOrderLabel(lastOrder.id)}</Text>
-            </View>
-            {lastOrder.deliveryDate && (
-              <Text style={styles.deliveryDate}>Fecha: {lastOrder.deliveryDate}</Text>
-            )}
-            {lastOrder.deliveryTimeSlot && (
-              <Text style={styles.deliveryTime}>Horario: {lastOrder.deliveryTimeSlot}</Text>
-            )}
-            <Text style={styles.deliveryAddress}>Dirección: {lastOrder.deliveryAddress}</Text>
-            {lastOrder.paymentMethod && (
-              <Text style={styles.paymentMethod}>Método de pago: {lastOrder.paymentMethod}</Text>
-            )}
-            <View style={styles.orderStatusContainer}>
-              <Text style={styles.orderStatusLabel}>Estado:</Text>
-              <Text style={[
-                styles.orderStatusValue,
-                lastOrder.status === 'delivered' && styles.orderStatusDelivered,
-                lastOrder.status === 'pending' && styles.orderStatusPending,
-                lastOrder.status === 'confirmed' && styles.orderStatusConfirmed,
-              ]}>
-                {lastOrder.status === 'pending' ? 'Pendiente' :
-                 lastOrder.status === 'confirmed' ? 'Confirmado' :
-                 lastOrder.status === 'preparing' ? 'Preparando' :
-                 lastOrder.status === 'shipped' ? 'En camino' :
-                 lastOrder.status === 'delivered' ? 'Entregado' :
-                 lastOrder.status === 'cancelled' ? 'Cancelado' : lastOrder.status}
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await loadProducts(); setRefreshing(false); }} tintColor={colors.primary} />}
+    >
+      <View style={[styles.header, { backgroundColor: colors.primary, paddingTop: headerPaddingTop }]}>
+        <View style={styles.headerTop}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.greeting}>¡Hola, {formatFirstName(user?.name)}!</Text>
+            <TouchableOpacity style={styles.locationRow} onPress={() => router.push('/profile/delivery-addresses')}>
+              <Ionicons name="location" size={14} color={colors.accent} />
+              <Text style={styles.locationText} numberOfLines={1}>
+                {user?.deliveryAddresses?.find((a) => a.isDefault)?.address ?? 'Agregar dirección de entrega'}
               </Text>
-            </View>
+              <Ionicons name="chevron-down" size={14} color={colors.accent} />
+            </TouchableOpacity>
           </View>
         </View>
-      )}
-
-      {/* Acciones rápidas */}
-      <View style={styles.quickActions}>
-        <Text style={styles.sectionTitle}>Acciones Rápidas</Text>
-        
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="grid" size={24} color={Colors.light.primary} />
-          <View style={styles.actionContent}>
-            <Text style={styles.actionText}>Catálogo de Productos</Text>
-            <Text style={styles.actionSubtext}>Ver todos los productos disponibles</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={Colors.light.textLight} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="receipt" size={24} color={Colors.light.warning} />
-          <View style={styles.actionContent}>
-            <Text style={styles.actionText}>Mis Pedidos</Text>
-            <Text style={styles.actionSubtext}>Historial y seguimiento</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={Colors.light.textLight} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="analytics" size={24} color={Colors.light.secondary} />
-          <View style={styles.actionContent}>
-            <Text style={styles.actionText}>Dashboard de Ventas</Text>
-            <Text style={styles.actionSubtext}>Métricas y reportes</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={Colors.light.textLight} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="person" size={24} color={Colors.light.info} />
-          <View style={styles.actionContent}>
-            <Text style={styles.actionText}>Mi Perfil</Text>
-            <Text style={styles.actionSubtext}>Configuración de cuenta</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={Colors.light.textLight} />
+        <TouchableOpacity style={styles.searchBar} onPress={() => router.push('/(tabs)/catalog')} activeOpacity={0.9}>
+          <Ionicons name="search" size={18} color={colors.textSecondary} />
+          <Text style={[styles.searchPlaceholder, { color: colors.textSecondary }]}>Buscar snacks Frito Lay...</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Beneficios para comerciantes */}
-      <View style={styles.benefitsContainer}>
-        <Text style={styles.sectionTitle}>Beneficios Exclusivos</Text>
-        
-        <View style={styles.benefitItem}>
-          <Ionicons name="shield-checkmark" size={20} color={Colors.light.success} />
-          <Text style={styles.benefitText}>Precios mayoristas preferenciales</Text>
+      <View style={[styles.wholesaleBar, { backgroundColor: colors.backgroundCard, borderColor: colors.border }]}>
+        <View>
+          <Text style={[styles.wholesaleTitle, { color: colors.text }]}>Modo {isWholesaleMode ? 'Mayorista' : 'Minorista'}</Text>
+          <Text style={[styles.wholesaleSub, { color: colors.textSecondary }]}>
+            {isWholesaleMode ? 'Precios especiales activos' : 'Activa para precios de comerciante'}
+          </Text>
         </View>
-        
-        <View style={styles.benefitItem}>
-          <Ionicons name="flash" size={20} color={Colors.light.warning} />
-          <Text style={styles.benefitText}>Entrega programada y confiable</Text>
-        </View>
-        
-        <View style={styles.benefitItem}>
-          <Ionicons name="refresh" size={20} color={Colors.light.primary} />
-          <Text style={styles.benefitText}>Reabastecimiento automático</Text>
-        </View>
-
-        <View style={styles.benefitItem}>
-          <Ionicons name="headset" size={20} color={Colors.light.info} />
-          <Text style={styles.benefitText}>Soporte especializado 24/7</Text>
-        </View>
+        <TouchableOpacity style={[styles.wholesaleToggle, { backgroundColor: isWholesaleMode ? colors.primary : colors.border }]} onPress={toggleWholesaleMode}>
+          <View style={[styles.wholesaleKnob, isWholesaleMode && styles.wholesaleKnobOn]} />
+        </TouchableOpacity>
       </View>
 
+      <PromoCarousel promos={homePromos} onPromoPress={(p) => goCatalog(p.categoryId)} />
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersRow}>
+        {quickOffers.map((o) => (
+          <TouchableOpacity key={o.id} style={[styles.offerChip, { backgroundColor: colors.backgroundCard, borderColor: colors.border }]} onPress={() => goCatalog()}>
+            <Text style={styles.offerEmoji}>{o.icon}</Text>
+            <Text style={[styles.offerLabel, { color: colors.text }]}>{o.label}</Text>
+            <Text style={[styles.offerDiscount, { color: colors.primary }]}>{o.discount}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <CategoryScroller onCategoryPress={goCatalog} />
+      <ProductHorizontalList title="🔥 Ofertas del momento" products={featuredProducts} onSeeAll={() => goCatalog()} onProductPress={() => goCatalog()} />
+      <ProductHorizontalList title="✨ Novedades" subtitle="Lo más reciente de Frito Lay Perú" products={newProducts.length ? newProducts : products.slice(0, 6)} onSeeAll={() => goCatalog()} onProductPress={() => goCatalog()} />
+      <ProductHorizontalList title="⭐ Más pedidos" products={bestSellers} onSeeAll={() => goCatalog()} onProductPress={() => goCatalog()} />
+
+      <View style={[styles.brandFooter, { backgroundColor: colors.backgroundCard }]}>
+        <Text style={[styles.brandFooterTitle, { color: colors.primary }]}>Frito-Lay Perú</Text>
+        <Text style={[styles.brandFooterSub, { color: colors.textSecondary }]}>Tu aliado en reabastecimiento</Text>
+      </View>
+      <View style={{ height: Spacing.xxl }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.light.backgroundSecondary,
-  },
-  header: {
-    backgroundColor: Colors.light.primary,
-    marginBottom: Spacing.lg,
-  },
-  brandLine: {
-    fontWeight: 'bold',
-    color: Colors.light.background,
-    letterSpacing: 0.5,
-    marginBottom: Spacing.sm,
-  },
-  brandAccent: {
-    color: Colors.light.accent,
-    fontWeight: '700',
-  },
-  welcomeText: {
-    fontWeight: 'bold',
-    color: Colors.light.background,
-    marginBottom: Spacing.xs,
-  },
-  subtitleText: {
-    fontSize: Dimensions.isSmallScreen ? FontSizes.xs : FontSizes.sm,
-    color: Colors.light.accent,
-  },
-  dashboardStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: Spacing.xs,
-  },
-  modeContainer: {
-    marginHorizontal: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  modeTitle: {
-    fontSize: Dimensions.isSmallScreen ? FontSizes.md : FontSizes.lg,
-    fontWeight: '600',
-    color: Colors.light.text,
-    flex: 1,
-  },
-  modeDescription: {
-    fontSize: Dimensions.isSmallScreen ? FontSizes.xs : FontSizes.sm,
-    color: Colors.light.textSecondary,
-    lineHeight: Dimensions.isSmallScreen ? 16 : 20,
-    marginTop: Spacing.sm,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    minHeight: Dimensions.isSmallScreen ? 80 : 100,
-  },
-  statNumber: {
-    fontSize: Dimensions.isSmallScreen ? FontSizes.lg : FontSizes.xl,
-    fontWeight: 'bold',
-    color: Colors.light.text,
-    marginVertical: Spacing.xs,
-  },
-  statLabel: {
-    fontSize: Dimensions.isSmallScreen ? FontSizes.xs : FontSizes.sm,
-    color: Colors.light.textSecondary,
-    textAlign: 'center',
-  },
-  deliveryContainer: {
-    backgroundColor: Colors.light.backgroundCard,
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    ...Shadows.sm,
-  },
-  deliveryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-  },
-  deliveryTitle: {
-    fontSize: FontSizes.lg,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginLeft: Spacing.sm,
-  },
-  deliveryInfo: {
-    backgroundColor: Colors.light.backgroundSecondary,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-  },
-  deliveryDate: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: Spacing.xs,
-  },
-  deliveryTime: {
-    fontSize: FontSizes.sm,
-    color: Colors.light.primary,
-    marginBottom: Spacing.xs,
-  },
-  deliveryAddress: {
-    fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
-    marginTop: Spacing.xs,
-  },
-  orderInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-    paddingBottom: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  orderLabel: {
-    fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
-    fontWeight: '500',
-  },
-  orderValue: {
-    fontSize: FontSizes.md,
-    color: Colors.light.primary,
-    fontWeight: '600',
-  },
-  paymentMethod: {
-    fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
-    marginTop: Spacing.xs,
-    fontStyle: 'italic',
-  },
-  orderStatusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-    paddingTop: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
-  },
-  orderStatusLabel: {
-    fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
-    marginRight: Spacing.sm,
-  },
-  orderStatusValue: {
-    fontSize: FontSizes.sm,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  orderStatusDelivered: {
-    color: Colors.light.success,
-  },
-  orderStatusPending: {
-    color: Colors.light.warning,
-  },
-  orderStatusConfirmed: {
-    color: Colors.light.primary,
-  },
-  scheduleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.light.primary,
-    borderStyle: 'dashed',
-  },
-  scheduleButtonText: {
-    fontSize: FontSizes.md,
-    color: Colors.light.primary,
-    marginLeft: Spacing.sm,
-    fontWeight: '500',
-  },
-  quickActions: {
-    backgroundColor: Colors.light.backgroundCard,
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    ...Shadows.sm,
-  },
-  sectionTitle: {
-    fontSize: FontSizes.xl,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: Spacing.lg,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  actionContent: {
-    flex: 1,
-    marginLeft: Spacing.md,
-  },
-  actionText: {
-    fontSize: FontSizes.md,
-    fontWeight: '500',
-    color: Colors.light.text,
-    marginBottom: Spacing.xs,
-  },
-  actionSubtext: {
-    fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
-  },
-  benefitsContainer: {
-    backgroundColor: Colors.light.backgroundCard,
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.xl,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    ...Shadows.sm,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-  },
-  benefitText: {
-    fontSize: FontSizes.sm,
-    color: Colors.light.text,
-    marginLeft: Spacing.md,
-    flex: 1,
-  },
-  dashboardCard: {
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
-  },
-  dashboardStat: {
-    alignItems: 'center',
-    flex: 1,
-    minWidth: 0,
-  },
-  dashboardNumber: {
-    fontSize: Dimensions.isSmallScreen ? FontSizes.md : FontSizes.lg,
-    fontWeight: 'bold',
-    color: Colors.light.text,
-    marginVertical: Spacing.xs,
-    textAlign: 'center',
-  },
-  dashboardLabel: {
-    fontSize: Dimensions.isSmallScreen ? FontSizes.xs : FontSizes.sm,
-    color: Colors.light.textSecondary,
-    textAlign: 'center',
-  },
-  monthlyProgress: {
-    marginTop: Spacing.lg,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  progressTitle: {
-    fontSize: FontSizes.md,
-    fontWeight: '600',
-    color: Colors.light.text,
-  },
-  progressValue: {
-    fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: BorderRadius.sm,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.light.primary,
-    borderRadius: BorderRadius.sm,
-  },
+  container: { flex: 1 },
+  header: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg, borderBottomLeftRadius: BorderRadius.xl, borderBottomRightRadius: BorderRadius.xl },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.md },
+  greeting: { color: '#fff', fontSize: FontSizes.xl, fontWeight: '800' },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, maxWidth: 240 },
+  locationText: { color: '#FFD700', fontSize: FontSizes.sm, flex: 1 },
+  cartBtn: { padding: Spacing.sm, position: 'relative' },
+  cartBadge: { position: 'absolute', top: 2, right: 2, backgroundColor: '#FFD700', borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
+  cartBadgeText: { fontSize: 10, fontWeight: '800', color: '#E31E24' },
+  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: BorderRadius.lg, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: Spacing.sm, ...Shadows.sm },
+  searchPlaceholder: { fontSize: FontSizes.md, flex: 1 },
+  wholesaleBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', margin: Spacing.lg, padding: Spacing.md, borderRadius: BorderRadius.lg, borderWidth: 1 },
+  wholesaleTitle: { fontSize: FontSizes.md, fontWeight: '700' },
+  wholesaleSub: { fontSize: FontSizes.xs, marginTop: 2 },
+  wholesaleToggle: { width: 48, height: 28, borderRadius: 14, justifyContent: 'center', padding: 3 },
+  wholesaleKnob: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff' },
+  wholesaleKnobOn: { alignSelf: 'flex-end' },
+  offersRow: { paddingHorizontal: Spacing.lg, gap: Spacing.sm, marginBottom: Spacing.md },
+  offerChip: { alignItems: 'center', padding: Spacing.sm, borderRadius: BorderRadius.lg, borderWidth: 1, minWidth: 80 },
+  offerEmoji: { fontSize: 24 },
+  offerLabel: { fontSize: FontSizes.xs, fontWeight: '600', marginTop: 2 },
+  offerDiscount: { fontSize: FontSizes.xs, fontWeight: '800' },
+  brandFooter: { marginHorizontal: Spacing.lg, padding: Spacing.lg, borderRadius: BorderRadius.lg, alignItems: 'center', ...Shadows.sm },
+  brandFooterTitle: { fontSize: FontSizes.lg, fontWeight: '800' },
+  brandFooterSub: { fontSize: FontSizes.sm, marginTop: 4 },
 });

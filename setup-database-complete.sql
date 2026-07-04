@@ -139,16 +139,22 @@ CREATE TRIGGER delivery_addresses_updated_at
 CREATE TABLE public.payment_methods (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
-  type VARCHAR(50) NOT NULL CHECK (type IN ('card', 'transfer', 'cash', 'credit')),
+  type VARCHAR(50) NOT NULL CHECK (type IN ('card', 'yape', 'plin', 'transfer', 'deposit', 'cash', 'credit')),
   name VARCHAR(255) NOT NULL,
   card_number VARCHAR(19),
   expiry_date VARCHAR(7),
   bank VARCHAR(255),
   account_number VARCHAR(50),
+  cci VARCHAR(20),
+  wallet_phone VARCHAR(9),
+  holder_name VARCHAR(255),
+  document_type VARCHAR(10) CHECK (document_type IN ('dni', 'ruc', 'ce')),
+  document_number VARCHAR(15),
   is_default BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
 
 CREATE INDEX idx_payment_methods_user_id ON public.payment_methods(user_id);
 

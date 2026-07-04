@@ -1,7 +1,5 @@
 import { supabase, isSupabaseAvailable } from '../lib/supabase';
 import { PaymentMethod } from '../data/userStorage';
-
-// Función para validar si un string es un UUID válido
 const isValidUUID = (str: string): boolean => {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
@@ -38,19 +36,19 @@ export const paymentMethodsService = {
       // Transformar de formato de tabla a formato PaymentMethod
       return (data || []).map((method: any) => ({
         id: method.id,
-        type: method.type as 'card' | 'transfer' | 'cash' | 'credit',
+        type: method.type as PaymentMethod['type'],
         name: method.name,
-        details: method.type === 'card'
-          ? {
-              cardNumber: method.card_number,
-              expiryDate: method.expiry_date,
-            }
-          : method.type === 'transfer'
-          ? {
-              bank: method.bank,
-              accountNumber: method.account_number,
-            }
-          : undefined,
+        details: {
+          cardNumber: method.card_number,
+          expiryDate: method.expiry_date,
+          bank: method.bank,
+          accountNumber: method.account_number,
+          cci: method.cci,
+          walletPhone: method.wallet_phone,
+          documentType: method.document_type,
+          documentNumber: method.document_number,
+          holderName: method.holder_name,
+        },
         isDefault: method.is_default || false,
       }));
     } catch (error) {
@@ -110,13 +108,16 @@ export const paymentMethodsService = {
       if (method.type === 'card' && method.details) {
         insertData.card_number = method.details.cardNumber;
         insertData.expiry_date = method.details.expiryDate;
-        console.log('[paymentMethodsService] Método tipo tarjeta, agregando datos de tarjeta');
-      } else if (method.type === 'transfer' && method.details) {
+      } else if (['transfer', 'deposit'].includes(method.type) && method.details) {
         insertData.bank = method.details.bank;
         insertData.account_number = method.details.accountNumber;
-        console.log('[paymentMethodsService] Método tipo transferencia, agregando datos bancarios');
-      } else if (method.type === 'cash' || method.type === 'credit') {
-        console.log('[paymentMethodsService] Método tipo', method.type, '(sin detalles adicionales)');
+        insertData.cci = method.details.cci;
+        insertData.holder_name = method.details.holderName;
+        insertData.document_type = method.details.documentType;
+        insertData.document_number = method.details.documentNumber;
+      } else if (['yape', 'plin'].includes(method.type) && method.details) {
+        insertData.wallet_phone = method.details.walletPhone;
+        insertData.holder_name = method.details.holderName;
       }
 
       console.log('[paymentMethodsService] Insertando en Supabase...', {
@@ -199,9 +200,14 @@ export const paymentMethodsService = {
       if (method.type === 'card' && method.details) {
         if (method.details.cardNumber !== undefined) updateData.card_number = method.details.cardNumber;
         if (method.details.expiryDate !== undefined) updateData.expiry_date = method.details.expiryDate;
-      } else if (method.type === 'transfer' && method.details) {
+      } else if (method.details) {
         if (method.details.bank !== undefined) updateData.bank = method.details.bank;
         if (method.details.accountNumber !== undefined) updateData.account_number = method.details.accountNumber;
+        if (method.details.cci !== undefined) updateData.cci = method.details.cci;
+        if (method.details.walletPhone !== undefined) updateData.wallet_phone = method.details.walletPhone;
+        if (method.details.documentType !== undefined) updateData.document_type = method.details.documentType;
+        if (method.details.documentNumber !== undefined) updateData.document_number = method.details.documentNumber;
+        if (method.details.holderName !== undefined) updateData.holder_name = method.details.holderName;
       }
 
       const updateQuery: any = supabase.from('payment_methods');

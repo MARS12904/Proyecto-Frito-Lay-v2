@@ -22,7 +22,7 @@ const convertSupabaseProduct = (dbProduct: any): Product => {
     id: dbProduct.id,
     name: dbProduct.name,
     brand: dbProduct.brand || 'Frito Lay',
-    category: dbProduct.category?.toLowerCase().replace(/\s+/g, '-') || 'otros',
+    category: dbProduct.category || 'otros',
     subcategory: dbProduct.category?.toLowerCase() || 'general',
     price: Number(dbProduct.price) || 0,
     wholesalePrice: Number(dbProduct.wholesale_price) || Number(dbProduct.price) * 0.8,

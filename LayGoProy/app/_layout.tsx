@@ -1,49 +1,53 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider } from '../contexts/AuthContext';
+import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { CartProvider } from '../contexts/CartContext';
 import { OrdersProvider } from '../contexts/OrdersContext';
 import { StockProvider } from '../contexts/StockContext';
 import { MetricsProvider } from '../contexts/MetricsContext';
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+export const unstable_settings = { anchor: '(tabs)' };
+
+function RootNavigator() {
+  const { isDark } = useTheme();
+  return (
+    <NavigationThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+      <Stack>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="auth" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="profile" options={{ headerShown: false }} />
+        <Stack.Screen name="catalog" options={{ headerShown: false }} />
+        <Stack.Screen name="cart" options={{ headerShown: false }} />
+        <Stack.Screen name="orders" options={{ headerShown: false }} />
+        <Stack.Screen name="payments" options={{ headerShown: false }} />
+      </Stack>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+    </NavigationThemeProvider>
+  );
+}
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
-
   return (
     <SafeAreaProvider>
-    <AuthProvider>
-      <StockProvider>
-        <MetricsProvider>
-          <OrdersProvider>
-            <CartProvider>
-              <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                <Stack>
-                  <Stack.Screen name="index" options={{ headerShown: false }} />
-                  <Stack.Screen name="auth" options={{ headerShown: false }} />
-                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                  <Stack.Screen name="profile" options={{ headerShown: false }} />
-                  <Stack.Screen name="catalog" options={{ headerShown: false }} />
-                  <Stack.Screen name="cart" options={{ headerShown: false }} />
-                  <Stack.Screen name="orders" options={{ headerShown: false }} />
-                  <Stack.Screen name="payments" options={{ headerShown: false }} />
-                </Stack>
-                <StatusBar style="auto" />
-              </ThemeProvider>
-            </CartProvider>
-          </OrdersProvider>
-        </MetricsProvider>
-      </StockProvider>
-    </AuthProvider>
+      <AuthProvider>
+        <ThemeProvider>
+          <StockProvider>
+            <MetricsProvider>
+              <OrdersProvider>
+                <CartProvider>
+                  <RootNavigator />
+                </CartProvider>
+              </OrdersProvider>
+            </MetricsProvider>
+          </StockProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
@@ -51,7 +51,7 @@ const isValidUrl = (url: string | undefined): boolean => {
   try {
     const urlObj = new URL(trimmedUrl);
     const isValidProtocol = urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
-    const hasHost = urlObj.hostname && urlObj.hostname.length > 0;
+    const hasHost = !!urlObj.hostname && urlObj.hostname.length > 0;
     return isValidProtocol && hasHost;
   } catch {
     return false;
@@ -105,7 +105,7 @@ const AsyncStorageAdapter = {
 
 // Crear cliente de Supabase solo si está configurado correctamente
 // IMPORTANTE: No crear el cliente si la configuración no es válida para evitar errores
-let supabaseClient: ReturnType<typeof createClient> | null = null;
+let supabaseClient: SupabaseClient | null = null;
 
 if (isSupabaseConfigured && supabaseUrl && supabaseAnonKey) {
   try {

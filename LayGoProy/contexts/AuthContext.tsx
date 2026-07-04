@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import { seedTestUsers } from '../data/seedUsers';
-import { UserStorage } from '../data/userStorage';
+import { UserStorage, PaymentMethod, DeliveryAddress } from '../data/userStorage';
 
 interface User {
   id: string;
@@ -16,25 +16,8 @@ interface User {
     notifications: boolean;
     theme: 'light' | 'dark' | 'auto';
   };
-  paymentMethods?: {
-    id: string;
-    type: 'card' | 'transfer' | 'cash' | 'credit';
-    name: string;
-    details?: {
-      cardNumber?: string;
-      expiryDate?: string;
-      bank?: string;
-      accountNumber?: string;
-    };
-    isDefault?: boolean;
-  }[];
-  deliveryAddresses?: {
-    id: string;
-    address: string;
-    zone?: string;
-    notes?: string;
-    isDefault?: boolean;
-  }[];
+  paymentMethods?: PaymentMethod[];
+  deliveryAddresses?: DeliveryAddress[];
   createdAt?: string;
   lastLogin?: string;
 }
@@ -260,11 +243,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (isValidUUID) {
           try {
-            const { userProfileService } = await import('../services/userProfileService');
+            const { paymentMethodsService } = await import('../services/paymentMethodsService');
+            const { deliveryAddressesService } = await import('../services/deliveryAddressesService');
             const [paymentMethods, deliveryAddresses] = await Promise.all([
-              userProfileService.getPaymentMethods(currentUser.id),
-              userProfileService.getDeliveryAddresses(currentUser.id),
+              paymentMethodsService.getPaymentMethods(currentUser.id),
+              deliveryAddressesService.getAddresses(currentUser.id),
             ]);
+
 
             // Si hay datos en Supabase, actualizar el usuario local
             if (paymentMethods !== null || deliveryAddresses !== null) {

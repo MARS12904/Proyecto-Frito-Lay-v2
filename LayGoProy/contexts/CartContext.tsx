@@ -5,7 +5,7 @@ import { useStock } from './StockContext';
 import { cartService } from '../services/cartService';
 import { useAuth } from './AuthContext';
 
-interface CartItem {
+export interface CartItem {
   product: Product;
   quantity: number;
   unitPrice: number; // Precio unitario (mayorista o regular)

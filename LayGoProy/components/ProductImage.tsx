@@ -13,7 +13,7 @@ interface ProductImageProps {
 
 // Validar si es una URL válida
 const isValidUrl = (url: string): boolean => {
-  return url && typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'));
+  return !!url && (url.startsWith('http://') || url.startsWith('https://'));
 };
 
 export default function ProductImage({

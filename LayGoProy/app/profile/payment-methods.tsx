@@ -18,22 +18,83 @@ import { ActionRow, ActionRowGroup } from '../../components/ui/ActionRow';
 import { useResponsive } from '../../hooks/useResponsive';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '../../constants/theme';
 import { PaymentMethod } from '../../data/userStorage';
+import { 
+  PERU_PAYMENT_TYPES, 
+  getPaymentTypeLabel, 
+  validateCCI, 
+  validatePeruPhone, 
+  PaymentMethodType,
+  DOCUMENT_TYPES,
+  validateDNI,
+  validateRUC
+} from '../../constants/payments';
+import { useAppColors } from '../../contexts/ThemeContext';
+
+type FormData = {
+  type: PaymentMethodType;
+  name: string;
+  cardNumber: string;
+  expiryDate: string;
+  bank: string;
+  accountNumber: string;
+  cci: string;
+  walletPhone: string;
+  holderName: string;
+  documentType: 'dni' | 'ruc' | 'ce';
+  documentNumber: string;
+};
+
+const buildDetails = (form: FormData) => {
+  if (form.type === 'card') return { cardNumber: form.cardNumber, expiryDate: form.expiryDate };
+  if (['yape', 'plin'].includes(form.type)) return { walletPhone: form.walletPhone, holderName: form.holderName };
+  if (form.type === 'transfer' || form.type === 'deposit') {
+    return { bank: form.bank, accountNumber: form.accountNumber, cci: form.cci, holderName: form.holderName, documentType: form.documentType, documentNumber: form.documentNumber };
+  }
+  return undefined;
+};
 
 export default function PaymentMethodsScreen() {
   const { user, updateProfile } = useAuth();
+  const colors = useAppColors();
+  const styles = getStyles(colors);
   const insets = useSafeAreaInsets();
+
   const { horizontalPadding, scaleFont, contentMaxWidth } = useResponsive();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(user?.paymentMethods || []);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
   const [formData, setFormData] = useState({
-    type: 'card' as 'card' | 'transfer' | 'cash' | 'credit',
+    type: 'yape' as PaymentMethodType,
     name: '',
     cardNumber: '',
     expiryDate: '',
     bank: '',
     accountNumber: '',
+    cci: '',
+    walletPhone: '',
+    holderName: '',
+    documentType: 'dni' as 'dni' | 'ruc' | 'ce',
+    documentNumber: '',
   });
+
+  const handleCardNumberChange = (text: string) => {
+    const cleanText = text.replace(/\D/g, '');
+    let formattedText = '';
+    for (let i = 0; i < cleanText.length; i += 4) {
+      if (i > 0) formattedText += ' ';
+      formattedText += cleanText.slice(i, i + 4);
+    }
+    setFormData(prev => ({ ...prev, cardNumber: formattedText }));
+  };
+
+  const handleExpiryDateChange = (text: string) => {
+    const cleanText = text.replace(/\D/g, '');
+    let formattedText = cleanText;
+    if (cleanText.length > 2) {
+      formattedText = `${cleanText.slice(0, 2)}/${cleanText.slice(2, 4)}`;
+    }
+    setFormData(prev => ({ ...prev, expiryDate: formattedText }));
+  };
 
   useEffect(() => {
     const loadPaymentMethods = async () => {
@@ -88,11 +149,33 @@ export default function PaymentMethodsScreen() {
       Alert.alert('Error', 'Completa todos los datos de la tarjeta');
       return;
     }
-
-    if (formData.type === 'transfer' && (!formData.bank || !formData.accountNumber)) {
-      Alert.alert('Error', 'Completa todos los datos de la transferencia');
+    if (['yape', 'plin'].includes(formData.type) && !validatePeruPhone(formData.walletPhone)) {
+      Alert.alert('Error', 'Ingresa un celular válido (9 dígitos)');
       return;
     }
+    if (formData.type === 'transfer' && (!formData.bank || !formData.cci || !validateCCI(formData.cci))) {
+      Alert.alert('Error', 'Completa banco y CCI válido (20 dígitos)');
+      return;
+    }
+    if (formData.type === 'deposit' && (!formData.bank || !formData.holderName)) {
+      Alert.alert('Error', 'Completa banco y titular');
+      return;
+    }
+    if (formData.type === 'transfer' || formData.type === 'deposit') {
+      if (!formData.holderName || !formData.documentNumber) {
+        Alert.alert('Error', 'Completa el nombre del titular y su número de documento');
+        return;
+      }
+      if (formData.documentType === 'dni' && !validateDNI(formData.documentNumber)) {
+        Alert.alert('Error', 'DNI inválido (debe tener 8 dígitos)');
+        return;
+      }
+      if (formData.documentType === 'ruc' && !validateRUC(formData.documentNumber)) {
+        Alert.alert('Error', 'RUC inválido (debe tener 11 dígitos y empezar con 10 o 20)');
+        return;
+      }
+    }
+
 
     if (!user) {
       Alert.alert('Error', 'No hay usuario autenticado');
@@ -116,11 +199,7 @@ export default function PaymentMethodsScreen() {
             {
               type: formData.type,
               name: formData.name.trim(),
-              details: formData.type === 'card' 
-                ? { cardNumber: formData.cardNumber, expiryDate: formData.expiryDate }
-                : formData.type === 'transfer'
-                ? { bank: formData.bank, accountNumber: formData.accountNumber }
-                : undefined,
+              details: buildDetails(formData),
               isDefault: paymentMethods.length === 0 || editingMethod.isDefault || false,
             }
           );
@@ -145,11 +224,7 @@ export default function PaymentMethodsScreen() {
           const methodId = await paymentMethodsService.savePaymentMethod(user.id, {
             type: formData.type,
             name: formData.name.trim(),
-            details: formData.type === 'card' 
-              ? { cardNumber: formData.cardNumber, expiryDate: formData.expiryDate }
-              : formData.type === 'transfer'
-              ? { bank: formData.bank, accountNumber: formData.accountNumber }
-              : undefined,
+            details: buildDetails(formData),
             isDefault: paymentMethods.length === 0 || false,
           });
 
@@ -177,11 +252,7 @@ export default function PaymentMethodsScreen() {
         id: editingMethod?.id || Date.now().toString(),
         type: formData.type,
         name: formData.name.trim(),
-        details: formData.type === 'card' 
-          ? { cardNumber: formData.cardNumber, expiryDate: formData.expiryDate }
-          : formData.type === 'transfer'
-          ? { bank: formData.bank, accountNumber: formData.accountNumber }
-          : undefined,
+        details: buildDetails(formData),
         isDefault: paymentMethods.length === 0 || editingMethod?.isDefault || false,
       };
 
@@ -293,23 +364,35 @@ export default function PaymentMethodsScreen() {
       expiryDate: method.details?.expiryDate || '',
       bank: method.details?.bank || '',
       accountNumber: method.details?.accountNumber || '',
+      cci: method.details?.cci || '',
+      walletPhone: method.details?.walletPhone || '',
+      holderName: method.details?.holderName || '',
+      documentType: method.details?.documentType || 'dni',
+      documentNumber: method.details?.documentNumber || '',
     });
     setShowAddModal(true);
   };
 
   const resetForm = () => {
     setFormData({
-      type: 'card',
+      type: 'yape',
       name: '',
       cardNumber: '',
       expiryDate: '',
       bank: '',
       accountNumber: '',
+      cci: '',
+      walletPhone: '',
+      holderName: '',
+      documentType: 'dni',
+      documentNumber: '',
     });
   };
 
   const getMethodIcon = (type: string) => {
     switch (type) {
+      case 'yape':
+      case 'plin': return 'phone-portrait-outline';
       case 'card': return 'card-outline';
       case 'transfer': return 'business-outline';
       case 'credit': return 'document-text-outline';
@@ -340,7 +423,7 @@ export default function PaymentMethodsScreen() {
       >
         {paymentMethods.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="card-outline" size={64} color={Colors.light.textLight} />
+            <Ionicons name="card-outline" size={64} color={colors.textLight} />
             <Text style={styles.emptyText}>No tienes métodos de pago guardados</Text>
             <Text style={styles.emptySubtext}>Agrega uno para facilitar tus compras</Text>
           </View>
@@ -352,21 +435,30 @@ export default function PaymentMethodsScreen() {
                   <Ionicons 
                     name={getMethodIcon(method.type) as any} 
                     size={24} 
-                    color={Colors.light.primary} 
+                    color={colors.primary} 
                   />
                   <View style={styles.methodDetails}>
                     <Text style={styles.methodName}>{method.name}</Text>
                     <Text style={styles.methodType}>
-                      {method.type === 'card' ? 'Tarjeta' :
-                       method.type === 'transfer' ? 'Transferencia' :
-                       method.type === 'credit' ? 'Crédito Comercial' :
-                       'Efectivo'}
+                      {getPaymentTypeLabel(method.type as PaymentMethodType)}
                     </Text>
-                    {method.details?.cardNumber && (
+                    {method.details?.cardNumber ? (
                       <Text style={styles.methodDetailsText}>
                         **** {method.details.cardNumber.slice(-4)}
                       </Text>
-                    )}
+                    ) : method.details?.walletPhone ? (
+                      <Text style={styles.methodDetailsText}>
+                        Cel: {method.details.walletPhone}
+                      </Text>
+                    ) : method.details?.cci ? (
+                      <Text style={styles.methodDetailsText}>
+                        {method.details.bank} - CCI: {method.details.cci}
+                      </Text>
+                    ) : method.details?.accountNumber ? (
+                      <Text style={styles.methodDetailsText}>
+                        {method.details.bank} - Cta: {method.details.accountNumber}
+                      </Text>
+                    ) : null}
                   </View>
                 </View>
                 {method.isDefault && (
@@ -381,22 +473,23 @@ export default function PaymentMethodsScreen() {
                     icon="star-outline"
                     label="Predeterminado"
                     onPress={() => handleSetDefault(method.id)}
-                    color={Colors.light.primary}
+                    color={colors.primary}
                   />
                 )}
                 <ActionRow
                   icon="create-outline"
                   label="Editar"
                   onPress={() => handleEdit(method)}
-                  color={Colors.light.secondary}
+                  color={colors.secondary}
                 />
                 <ActionRow
                   icon="trash-outline"
                   label="Eliminar"
                   onPress={() => handleDelete(method.id)}
-                  color={Colors.light.error}
+                  color={colors.error}
                 />
               </ActionRowGroup>
+
             </View>
           ))
         )}
@@ -410,7 +503,7 @@ export default function PaymentMethodsScreen() {
             setEditingMethod(null);
             setShowAddModal(true);
           }}
-          icon={<Ionicons name="add" size={22} color={Colors.light.background} />}
+          icon={<Ionicons name="add" size={22} color={colors.background} />}
         />
       </View>
 
@@ -422,31 +515,14 @@ export default function PaymentMethodsScreen() {
         <View style={styles.inputGroup}>
           <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Tipo de pago</Text>
           <View style={styles.typeButtons}>
-            {(['card', 'transfer', 'credit', 'cash'] as const).map((type) => (
+            {PERU_PAYMENT_TYPES.map((opt) => (
               <TouchableOpacity
-                key={type}
-                style={[
-                  styles.typeButton,
-                  formData.type === type && styles.typeButtonActive,
-                ]}
-                onPress={() => setFormData({ ...formData, type })}
+                key={opt.id}
+                style={[styles.typeButton, formData.type === opt.id && styles.typeButtonActive]}
+                onPress={() => setFormData({ ...formData, type: opt.id })}
               >
-                <Text
-                  style={[
-                    styles.typeButtonText,
-                    { fontSize: scaleFont(12) },
-                    formData.type === type && styles.typeButtonTextActive,
-                  ]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                >
-                  {type === 'card'
-                    ? 'Tarjeta'
-                    : type === 'transfer'
-                      ? 'Transferencia'
-                      : type === 'credit'
-                        ? 'Crédito'
-                        : 'Efectivo'}
+                <Text style={[styles.typeButtonText, { fontSize: scaleFont(11) }, formData.type === opt.id && styles.typeButtonTextActive]} numberOfLines={1}>
+                  {opt.label}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -470,8 +546,9 @@ export default function PaymentMethodsScreen() {
               <TextInput
                 style={styles.input}
                 value={formData.cardNumber}
-                onChangeText={(text) => setFormData({ ...formData, cardNumber: text })}
+                onChangeText={handleCardNumberChange}
                 placeholder="1234 5678 9012 3456"
+                placeholderTextColor={colors.textLight}
                 keyboardType="numeric"
                 maxLength={19}
               />
@@ -481,8 +558,9 @@ export default function PaymentMethodsScreen() {
               <TextInput
                 style={styles.input}
                 value={formData.expiryDate}
-                onChangeText={(text) => setFormData({ ...formData, expiryDate: text })}
+                onChangeText={handleExpiryDateChange}
                 placeholder="MM/AA"
+                placeholderTextColor={colors.textLight}
                 keyboardType="numeric"
                 maxLength={5}
               />
@@ -490,29 +568,65 @@ export default function PaymentMethodsScreen() {
           </>
         )}
 
-        {formData.type === 'transfer' && (
+        {['yape', 'plin'].includes(formData.type) && (
+          <>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Celular *</Text>
+              <TextInput style={styles.input} value={formData.walletPhone} onChangeText={(t) => setFormData({ ...formData, walletPhone: t })} placeholder="9XXXXXXXX" keyboardType="phone-pad" maxLength={9} />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Titular</Text>
+              <TextInput style={styles.input} value={formData.holderName} onChangeText={(t) => setFormData({ ...formData, holderName: t })} placeholder="Nombre en la billetera" />
+            </View>
+          </>
+        )}
+
+        {(formData.type === 'transfer' || formData.type === 'deposit') && (
           <>
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Banco *</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.bank}
-                onChangeText={(text) => setFormData({ ...formData, bank: text })}
-                placeholder="Ej: BCP"
-              />
+              <TextInput style={styles.input} value={formData.bank} onChangeText={(t) => setFormData({ ...formData, bank: t })} placeholder="Ej: BCP" />
+            </View>
+            {formData.type === 'transfer' && (
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>CCI * (20 dígitos)</Text>
+                <TextInput style={styles.input} value={formData.cci} onChangeText={(t) => setFormData({ ...formData, cci: t })} placeholder="011XXXXXXXXXXXXXXX" keyboardType="numeric" maxLength={20} />
+              </View>
+            )}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Titular *</Text>
+              <TextInput style={styles.input} value={formData.holderName} onChangeText={(t) => setFormData({ ...formData, holderName: t })} placeholder="Nombre del titular" />
             </View>
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Número de cuenta *</Text>
+              <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Tipo de Documento *</Text>
+              <View style={styles.typeButtons}>
+                {DOCUMENT_TYPES.map((doc) => (
+                  <TouchableOpacity
+                    key={doc.id}
+                    style={[styles.typeButton, formData.documentType === doc.id && styles.typeButtonActive, { flexBasis: '28%', flexGrow: 0 }]}
+                    onPress={() => setFormData({ ...formData, documentType: doc.id as any })}
+                  >
+                    <Text style={[styles.typeButtonText, { fontSize: scaleFont(11) }, formData.documentType === doc.id && styles.typeButtonTextActive]}>
+                      {doc.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Número de Documento *</Text>
               <TextInput
                 style={styles.input}
-                value={formData.accountNumber}
-                onChangeText={(text) => setFormData({ ...formData, accountNumber: text })}
-                placeholder="Número de cuenta"
+                value={formData.documentNumber}
+                onChangeText={(t) => setFormData({ ...formData, documentNumber: t.replace(/\D/g, '') })}
+                placeholder={formData.documentType === 'ruc' ? "Ingresa RUC de 11 dígitos" : "Ingresa DNI de 8 dígitos"}
                 keyboardType="numeric"
+                maxLength={formData.documentType === 'ruc' ? 11 : 8}
               />
             </View>
           </>
         )}
+
 
         <AppButton label="Guardar" onPress={handleSave} />
       </FormSheetModal>
@@ -520,10 +634,10 @@ export default function PaymentMethodsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
   },
   content: {
     flex: 1,
@@ -533,9 +647,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: colors.border,
     paddingTop: Spacing.md,
     ...Shadows.md,
   },
@@ -546,17 +660,17 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: FontSizes.lg,
-    color: Colors.light.text,
+    color: colors.text,
     marginTop: Spacing.md,
     fontWeight: '500',
   },
   emptySubtext: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginTop: Spacing.xs,
   },
   methodCard: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     marginBottom: Spacing.md,
@@ -579,27 +693,27 @@ const styles = StyleSheet.create({
   methodName: {
     fontSize: FontSizes.md,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.xs,
   },
   methodType: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginBottom: Spacing.xs,
   },
   methodDetailsText: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   defaultBadge: {
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.sm,
   },
   defaultBadgeText: {
     fontSize: FontSizes.xs,
-    color: Colors.light.background,
+    color: colors.background,
     fontWeight: '600',
   },
   inputGroup: {
@@ -608,17 +722,17 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: FontSizes.sm,
     fontWeight: '500',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.sm,
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     fontSize: FontSizes.md,
-    color: Colors.light.text,
-    backgroundColor: Colors.light.background,
+    color: colors.text,
+    backgroundColor: colors.background,
   },
   typeButtons: {
     flexDirection: 'row',
@@ -633,22 +747,23 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: Colors.light.border,
-    backgroundColor: Colors.light.background,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
   typeButtonActive: {
-    borderColor: Colors.light.primary,
-    backgroundColor: Colors.light.primary,
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
   },
   typeButtonText: {
-    color: Colors.light.text,
+    color: colors.text,
     textAlign: 'center',
   },
   typeButtonTextActive: {
-    color: Colors.light.background,
+    color: colors.background,
     fontWeight: '600',
   },
 });
+
 

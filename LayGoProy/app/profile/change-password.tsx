@@ -13,8 +13,13 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppColors } from '../../contexts/ThemeContext';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 
 export default function ChangePasswordScreen() {
+  const colors = useAppColors();
+  const styles = getStyles(colors);
+
   const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -67,34 +72,25 @@ export default function ChangePasswordScreen() {
     }
   };
 
-  const handleCancel = () => {
-    router.back();
-  };
-
   return (
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-          <Text style={styles.cancelButtonText}>Cancelar</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Cambiar Contraseña</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <ScreenHeader title="Cambiar Contraseña" />
 
       <ScrollView style={styles.content}>
         <View style={styles.form}>
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Contraseña actual *</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
+              <Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 value={formData.currentPassword}
                 onChangeText={(value) => handleInputChange('currentPassword', value)}
                 placeholder="Ingresa tu contraseña actual"
+                placeholderTextColor={colors.textLight}
                 secureTextEntry={!showCurrentPassword}
               />
               <TouchableOpacity
@@ -104,7 +100,7 @@ export default function ChangePasswordScreen() {
                 <Ionicons 
                   name={showCurrentPassword ? "eye-off-outline" : "eye-outline"} 
                   size={20} 
-                  color="#666" 
+                  color={colors.textSecondary} 
                 />
               </TouchableOpacity>
             </View>
@@ -113,12 +109,13 @@ export default function ChangePasswordScreen() {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Nueva contraseña *</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
+              <Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 value={formData.newPassword}
                 onChangeText={(value) => handleInputChange('newPassword', value)}
                 placeholder="Ingresa tu nueva contraseña"
+                placeholderTextColor={colors.textLight}
                 secureTextEntry={!showNewPassword}
               />
               <TouchableOpacity
@@ -128,7 +125,7 @@ export default function ChangePasswordScreen() {
                 <Ionicons 
                   name={showNewPassword ? "eye-off-outline" : "eye-outline"} 
                   size={20} 
-                  color="#666" 
+                  color={colors.textSecondary} 
                 />
               </TouchableOpacity>
             </View>
@@ -137,12 +134,13 @@ export default function ChangePasswordScreen() {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Confirmar nueva contraseña *</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
+              <Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 value={formData.confirmPassword}
                 onChangeText={(value) => handleInputChange('confirmPassword', value)}
                 placeholder="Confirma tu nueva contraseña"
+                placeholderTextColor={colors.textLight}
                 secureTextEntry={!showConfirmPassword}
               />
               <TouchableOpacity
@@ -152,7 +150,7 @@ export default function ChangePasswordScreen() {
                 <Ionicons 
                   name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} 
                   size={20} 
-                  color="#666" 
+                  color={colors.textSecondary} 
                 />
               </TouchableOpacity>
             </View>
@@ -173,10 +171,10 @@ export default function ChangePasswordScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.backgroundSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -184,21 +182,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.backgroundCard,
     borderBottomWidth: 1,
-    borderBottomColor: '#e1e5e9',
+    borderBottomColor: colors.border,
   },
   cancelButton: {
     padding: 8,
   },
   cancelButtonText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: colors.primary,
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: colors.text,
   },
   placeholder: {
     width: 60,
@@ -215,17 +213,17 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333',
+    color: colors.text,
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
     borderRadius: 12,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#e1e5e9',
+    borderColor: colors.border,
   },
   inputIcon: {
     marginRight: 12,
@@ -234,13 +232,13 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 50,
     fontSize: 16,
-    color: '#333',
+    color: colors.text,
   },
   eyeIcon: {
     padding: 8,
   },
   changeButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primary,
     borderRadius: 12,
     height: 50,
     justifyContent: 'center',
@@ -248,10 +246,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   changeButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: colors.border,
+    opacity: 0.6,
   },
   changeButtonText: {
-    color: '#fff',
+    color: colors.background,
     fontSize: 16,
     fontWeight: '600',
   },

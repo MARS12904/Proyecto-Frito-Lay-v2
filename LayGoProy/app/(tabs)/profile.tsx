@@ -26,7 +26,10 @@ import {
   Shadows, 
   responsive 
 } from '../../constants/theme';
+import { useAppColors } from '../../contexts/ThemeContext';
+import { openSupportWhatsApp } from '../../utils/linking';
 import { useResponsive } from '../../hooks/useResponsive';
+
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -37,6 +40,11 @@ export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     user?.preferences?.notifications ?? true
   );
+  const [darkModeEnabled, setDarkModeEnabled] = useState(
+    user?.preferences?.theme === 'dark'
+  );
+  const colors = useAppColors();
+  const styles = getStyles(colors);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const { headerPaddingTop } = useResponsive();
 
@@ -187,15 +195,30 @@ export default function ProfileScreen() {
     );
   };
 
+  const handleDarkModeToggle = async (value: boolean) => {
+    setDarkModeEnabled(value);
+    const success = await updateProfile({
+      preferences: {
+        notifications: notificationsEnabled,
+        theme: value ? 'dark' : 'light',
+      },
+    });
+    if (!success) {
+      Alert.alert('Error', 'No se pudo cambiar el tema');
+      setDarkModeEnabled(!value);
+    }
+  };
+
+  const handleContact = () => openSupportWhatsApp(user?.name);
+
   const handleNotificationToggle = async (value: boolean) => {
     setNotificationsEnabled(value);
     const success = await updateProfile({
       preferences: {
         notifications: value,
-        theme: user?.preferences?.theme || 'auto'
-      }
+        theme: darkModeEnabled ? 'dark' : 'light',
+      },
     });
-    
     if (!success) {
       Alert.alert('Error', 'Error al actualizar las preferencias');
       setNotificationsEnabled(!value);
@@ -206,7 +229,7 @@ export default function ProfileScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle" size={48} color={Colors.light.error} />
+          <Ionicons name="alert-circle" size={48} color={colors.error} />
           <Text style={styles.errorText}>Error: Usuario no encontrado</Text>
         </View>
       </View>
@@ -218,19 +241,18 @@ export default function ProfileScreen() {
     : 0;
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header del perfil */}
-      <View style={[styles.header, { paddingTop: headerPaddingTop + Spacing.lg }]}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.backgroundSecondary }]} showsVerticalScrollIndicator={false}>
+      <View style={[styles.header, { paddingTop: headerPaddingTop + Spacing.lg, backgroundColor: colors.backgroundCard }]}>
         <View style={styles.profileImageContainer}>
           {isUploadingImage ? (
             <View style={[styles.defaultProfileImage, styles.uploadingContainer]}>
-              <ActivityIndicator size="large" color={Colors.light.primary} />
+              <ActivityIndicator size="large" color={colors.primary} />
             </View>
           ) : user.profileImage ? (
             <Image source={{ uri: user.profileImage }} style={styles.profileImage} />
           ) : (
             <View style={styles.defaultProfileImage}>
-              <Ionicons name="business" size={responsive({ xs: 32, sm: 36, md: 40 })} color={Colors.light.primary} />
+              <Ionicons name="business" size={responsive({ xs: 32, sm: 36, md: 40 })} color={colors.primary} />
             </View>
           )}
           <TouchableOpacity 
@@ -243,8 +265,13 @@ export default function ProfileScreen() {
         </View>
         
         <View style={styles.userInfo}>
-          <Text style={styles.name}>{user.name}</Text>
-          <Text style={styles.email}>{user.email}</Text>
+          <Text style={[styles.name, { color: colors.text }]}>{user.name}</Text>
+          <Text style={[styles.email, { color: colors.textSecondary }]}>{user.email}</Text>
+          {user.phone ? (
+            <Text style={[styles.phone, { color: colors.textSecondary }]}>
+              <Ionicons name="call-outline" size={14} /> {user.phone}
+            </Text>
+          ) : null}
           {isWholesaleMode && (
             <View style={styles.merchantBadge}>
               <Ionicons name="business" size={responsive({ xs: 12, sm: 14, md: 16 })} color={Colors.light.primary} />
@@ -450,10 +477,10 @@ export default function ProfileScreen() {
             <Text style={styles.menuItemText}>Modo Oscuro</Text>
           </View>
           <Switch
-            value={false}
-            onValueChange={() => {}}
-            trackColor={{ false: Colors.light.border, true: Colors.light.secondary }}
-            thumbColor={false ? Colors.light.textLight : Colors.light.background}
+            value={darkModeEnabled}
+            onValueChange={handleDarkModeToggle}
+            trackColor={{ false: colors.border, true: colors.secondary }}
+            thumbColor={darkModeEnabled ? colors.background : colors.textLight}
           />
         </View>
       </View>
@@ -472,31 +499,31 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={responsive({ xs: 16, sm: 18, md: 20 })} color={Colors.light.textLight} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={handleContact}>
           <View style={styles.menuItemLeft}>
             <View style={styles.menuIconContainer}>
-              <Ionicons name="mail-outline" size={responsive({ xs: 20, sm: 22, md: 24 })} color={Colors.light.success} />
+              <Ionicons name="logo-whatsapp" size={responsive({ xs: 20, sm: 22, md: 24 })} color="#25D366" />
             </View>
-            <Text style={styles.menuItemText}>Contacto</Text>
+            <Text style={styles.menuItemText}>Contacto WhatsApp</Text>
           </View>
-          <Ionicons name="chevron-forward" size={responsive({ xs: 16, sm: 18, md: 20 })} color={Colors.light.textLight} />
+          <Ionicons name="chevron-forward" size={responsive({ xs: 16, sm: 18, md: 20 })} color={colors.textLight} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
           <View style={styles.menuItemLeft}>
             <View style={styles.menuIconContainer}>
-              <Ionicons name="information-circle-outline" size={responsive({ xs: 20, sm: 22, md: 24 })} color={Colors.light.success} />
+              <Ionicons name="information-circle-outline" size={responsive({ xs: 20, sm: 22, md: 24 })} color={colors.success} />
             </View>
             <Text style={styles.menuItemText}>Acerca de</Text>
           </View>
-          <Ionicons name="chevron-forward" size={responsive({ xs: 16, sm: 18, md: 20 })} color={Colors.light.textLight} />
+          <Ionicons name="chevron-forward" size={responsive({ xs: 16, sm: 18, md: 20 })} color={colors.textLight} />
         </TouchableOpacity>
       </View>
 
       {/* Botón de cerrar sesión */}
       <View style={styles.logoutSection}>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={responsive({ xs: 20, sm: 22, md: 24 })} color={Colors.light.error} />
+          <Ionicons name="log-out-outline" size={responsive({ xs: 20, sm: 22, md: 24 })} color={colors.error} />
           <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
         </TouchableOpacity>
       </View>
@@ -507,10 +534,10 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
   },
   
   // Error state
@@ -522,14 +549,14 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: FontSizes.lg,
-    color: Colors.light.error,
+    color: colors.error,
     marginTop: Spacing.md,
     textAlign: 'center',
   },
 
   // Header
   header: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     paddingBottom: responsive({ xs: 24, sm: 28, md: 32 }),
     paddingHorizontal: Spacing.lg,
     alignItems: 'center',
@@ -548,17 +575,17 @@ const styles = StyleSheet.create({
     width: responsive({ xs: 80, sm: 90, md: 100 }),
     height: responsive({ xs: 80, sm: 90, md: 100 }),
     borderRadius: responsive({ xs: 40, sm: 45, md: 50 }),
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   editImageButton: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     borderRadius: responsive({ xs: 12, sm: 14, md: 15 }),
     width: responsive({ xs: 24, sm: 28, md: 30 }),
     height: responsive({ xs: 24, sm: 28, md: 30 }),
@@ -572,6 +599,7 @@ const styles = StyleSheet.create({
   uploadingContainer: {
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.backgroundSecondary,
   },
   userInfo: {
     alignItems: 'center',
@@ -579,29 +607,35 @@ const styles = StyleSheet.create({
   name: {
     fontSize: responsive({ xs: 20, sm: 22, md: 24 }),
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.xs,
     textAlign: 'center',
   },
   email: {
     fontSize: responsive({ xs: 14, sm: 15, md: 16 }),
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
+    marginBottom: Spacing.xs,
+    textAlign: 'center',
+  },
+  phone: {
+    fontSize: responsive({ xs: 13, sm: 14, md: 15 }),
     marginBottom: Spacing.sm,
     textAlign: 'center',
+    color: colors.textSecondary,
   },
   merchantBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
-    borderColor: Colors.light.primary,
+    borderColor: colors.primary,
   },
   merchantBadgeText: {
     fontSize: responsive({ xs: 10, sm: 11, md: 12 }),
-    color: Colors.light.primary,
+    color: colors.primary,
     marginLeft: Spacing.xs,
     fontWeight: '600',
   },
@@ -613,7 +647,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: responsive({ xs: 18, sm: 20, md: 22 }),
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.lg,
   },
 
@@ -626,7 +660,7 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     minWidth: 0,
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
     alignItems: 'center',
@@ -636,7 +670,7 @@ const styles = StyleSheet.create({
     width: responsive({ xs: 36, sm: 40, md: 44 }),
     height: responsive({ xs: 36, sm: 40, md: 44 }),
     borderRadius: responsive({ xs: 18, sm: 20, md: 22 }),
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.sm,
@@ -644,19 +678,19 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: responsive({ xs: 16, sm: 18, md: 20 }),
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.xs,
   },
   statLabel: {
     fontSize: responsive({ xs: 10, sm: 11, md: 12 }),
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     fontWeight: '500',
   },
 
   // Progress card
   progressCard: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.lg,
@@ -671,42 +705,42 @@ const styles = StyleSheet.create({
   progressTitle: {
     fontSize: responsive({ xs: 16, sm: 17, md: 18 }),
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
   },
   progressValue: {
     fontSize: responsive({ xs: 14, sm: 15, md: 16 }),
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   progressBar: {
     height: responsive({ xs: 6, sm: 7, md: 8 }),
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: BorderRadius.full,
     marginBottom: Spacing.sm,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     borderRadius: BorderRadius.full,
   },
   progressPercentage: {
     fontSize: responsive({ xs: 12, sm: 13, md: 14 }),
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     fontWeight: '500',
   },
 
   // Cards
   topProductsCard: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.lg,
     ...Shadows.sm,
   },
   activityCard: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.lg,
@@ -715,7 +749,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: responsive({ xs: 16, sm: 17, md: 18 }),
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.md,
   },
 
@@ -726,7 +760,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: colors.border,
   },
   productInfo: {
     flex: 1,
@@ -734,17 +768,17 @@ const styles = StyleSheet.create({
   },
   productName: {
     fontSize: responsive({ xs: 14, sm: 15, md: 16 }),
-    color: Colors.light.text,
+    color: colors.text,
     fontWeight: '500',
     marginBottom: Spacing.xs,
   },
   productQuantity: {
     fontSize: responsive({ xs: 12, sm: 13, md: 14 }),
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   productRevenue: {
     fontSize: responsive({ xs: 14, sm: 15, md: 16 }),
-    color: Colors.light.success,
+    color: colors.success,
     fontWeight: '600',
   },
 
@@ -754,13 +788,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: colors.border,
   },
   activityIcon: {
     width: responsive({ xs: 32, sm: 36, md: 40 }),
     height: responsive({ xs: 32, sm: 36, md: 40 }),
     borderRadius: responsive({ xs: 16, sm: 18, md: 20 }),
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: Spacing.md,
@@ -771,23 +805,23 @@ const styles = StyleSheet.create({
   },
   activityDescription: {
     fontSize: responsive({ xs: 14, sm: 15, md: 16 }),
-    color: Colors.light.text,
+    color: colors.text,
     fontWeight: '500',
     marginBottom: Spacing.xs,
   },
   activityDate: {
     fontSize: responsive({ xs: 12, sm: 13, md: 14 }),
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   activityAmount: {
     fontSize: responsive({ xs: 14, sm: 15, md: 16 }),
-    color: Colors.light.success,
+    color: colors.success,
     fontWeight: '600',
   },
 
   // Sections
   section: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
     borderRadius: BorderRadius.lg,
@@ -801,7 +835,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: Spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: colors.border,
   },
   menuItemLeft: {
     flexDirection: 'row',
@@ -812,19 +846,19 @@ const styles = StyleSheet.create({
     width: responsive({ xs: 36, sm: 40, md: 44 }),
     height: responsive({ xs: 36, sm: 40, md: 44 }),
     borderRadius: responsive({ xs: 18, sm: 20, md: 22 }),
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: Spacing.md,
   },
   menuItemText: {
     fontSize: responsive({ xs: 14, sm: 15, md: 16 }),
-    color: Colors.light.text,
+    color: colors.text,
     fontWeight: '500',
   },
   badgeText: {
     fontSize: responsive({ xs: 12, sm: 13, md: 14 }),
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '400',
   },
 
@@ -838,15 +872,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.lg,
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: Colors.light.error,
+    borderColor: colors.error,
     ...Shadows.sm,
   },
   logoutButtonText: {
     fontSize: responsive({ xs: 14, sm: 15, md: 16 }),
-    color: Colors.light.error,
+    color: colors.error,
     fontWeight: '600',
     marginLeft: Spacing.sm,
   },

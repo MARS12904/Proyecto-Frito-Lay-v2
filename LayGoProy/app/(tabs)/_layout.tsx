@@ -3,18 +3,19 @@ import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAppColors } from '@/contexts/ThemeContext';
 import { useCart } from '../../contexts/CartContext';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const colors = useAppColors();
   const { totalItems } = useCart();
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.tabIconDefault,
+        tabBarStyle: { backgroundColor: colors.backgroundCard, borderTopColor: colors.border },
         headerShown: false,
         tabBarButton: HapticTab,
       }}>

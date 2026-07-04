@@ -5,6 +5,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Shadows } from '../../constants/theme';
 import { useResponsive } from '../../hooks/useResponsive';
+import { useAppColors } from '../../contexts/ThemeContext';
 
 type ScreenHeaderProps = {
   title: string;
@@ -15,6 +16,8 @@ type ScreenHeaderProps = {
 export function ScreenHeader({ title, onBack, rightSlot }: ScreenHeaderProps) {
   const insets = useSafeAreaInsets();
   const { scaleFont, isCompact, horizontalPadding } = useResponsive();
+  const colors = useAppColors();
+  const styles = getStyles(colors);
 
   const handleBack = () => {
     if (onBack) {
@@ -45,7 +48,7 @@ export function ScreenHeader({ title, onBack, rightSlot }: ScreenHeaderProps) {
           accessibilityRole="button"
           accessibilityLabel="Volver"
         >
-          <Ionicons name="arrow-back" size={22} color={Colors.light.text} />
+          <Ionicons name="arrow-back" size={22} color={colors.text} />
         </TouchableOpacity>
 
         <Text
@@ -63,11 +66,11 @@ export function ScreenHeader({ title, onBack, rightSlot }: ScreenHeaderProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   wrapper: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: colors.border,
     ...Shadows.sm,
   },
   row: {
@@ -89,7 +92,7 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     fontWeight: '700',
-    color: Colors.light.text,
+    color: colors.text,
     textAlign: 'center',
     marginHorizontal: 4,
   },

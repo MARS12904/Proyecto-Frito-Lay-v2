@@ -13,9 +13,14 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppColors } from '../../contexts/ThemeContext';
+import { ScreenHeader } from '../../components/ui/ScreenHeader';
 
 export default function EditProfileScreen() {
   const { user, updateProfile } = useAuth();
+  const colors = useAppColors();
+  const styles = getStyles(colors);
+  
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -46,42 +51,38 @@ export default function EditProfileScreen() {
     }
   };
 
-  const handleCancel = () => {
-    router.back();
-  };
-
   return (
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-          <Text style={styles.cancelButtonText}>Cancelar</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Editar Perfil</Text>
-        <TouchableOpacity 
-          style={[styles.saveButton, isLoading && styles.saveButtonDisabled]} 
-          onPress={handleSave}
-          disabled={isLoading}
-        >
-          <Text style={styles.saveButtonText}>
-            {isLoading ? 'Guardando...' : 'Guardar'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader 
+        title="Editar Perfil" 
+        rightSlot={
+          <TouchableOpacity 
+            style={[styles.saveButton, isLoading && styles.saveButtonDisabled]} 
+            onPress={handleSave}
+            disabled={isLoading}
+          >
+            <Text style={styles.saveButtonText}>
+              {isLoading ? '...' : 'Guardar'}
+            </Text>
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView style={styles.content}>
         <View style={styles.form}>
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Nombre completo *</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
+              <Ionicons name="person-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 value={formData.name}
                 onChangeText={(value) => handleInputChange('name', value)}
                 placeholder="Ingresa tu nombre completo"
+                placeholderTextColor={colors.textLight}
                 autoCapitalize="words"
               />
             </View>
@@ -90,12 +91,13 @@ export default function EditProfileScreen() {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Correo electrónico *</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
+              <Ionicons name="mail-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 value={formData.email}
                 onChangeText={(value) => handleInputChange('email', value)}
                 placeholder="Ingresa tu correo electrónico"
+                placeholderTextColor={colors.textLight}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -106,12 +108,13 @@ export default function EditProfileScreen() {
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Teléfono</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="call-outline" size={20} color="#666" style={styles.inputIcon} />
+              <Ionicons name="call-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 value={formData.phone}
                 onChangeText={(value) => handleInputChange('phone', value)}
                 placeholder="Ingresa tu número de teléfono"
+                placeholderTextColor={colors.textLight}
                 keyboardType="phone-pad"
               />
             </View>
@@ -122,10 +125,10 @@ export default function EditProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.backgroundSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -133,21 +136,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.backgroundCard,
     borderBottomWidth: 1,
-    borderBottomColor: '#e1e5e9',
+    borderBottomColor: colors.border,
   },
   cancelButton: {
     padding: 8,
   },
   cancelButtonText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: colors.primary,
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: colors.text,
   },
   saveButton: {
     padding: 8,
@@ -157,7 +160,7 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: colors.primary,
     fontWeight: '600',
   },
   content: {
@@ -172,17 +175,17 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333',
+    color: colors.text,
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
     borderRadius: 12,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#e1e5e9',
+    borderColor: colors.border,
   },
   inputIcon: {
     marginRight: 12,
@@ -191,6 +194,6 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 50,
     fontSize: 16,
-    color: '#333',
+    color: colors.text,
   },
 });

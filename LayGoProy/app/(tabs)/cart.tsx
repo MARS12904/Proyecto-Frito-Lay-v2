@@ -11,18 +11,41 @@ import {
     View,
 } from 'react-native';
 import { router } from 'expo-router';
-import { useCart } from '../../contexts/CartContext';
+import { useCart, CartItem } from '../../contexts/CartContext';
 import DeliveryScheduler from '../../components/DeliveryScheduler';
 import ProductImage from '../../components/ProductImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows, Dimensions as ThemeDimensions } from '../../constants/theme';
 import { useResponsive } from '../../hooks/useResponsive';
+import { useAppColors } from '../../contexts/ThemeContext';
+import { AppButton } from '../../components/ui/AppButton';
+
+const parseLocalDate = (dateStr: string): Date => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const formatDateForDisplay = (dateStr: string): string => {
+  try {
+    const date = parseLocalDate(dateStr);
+    return isNaN(date.getTime()) ? dateStr : date.toLocaleDateString('es-PE', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch {
+    return dateStr;
+  }
+};
 
 export default function CartScreen() {
   return <CartContent />;
 }
 
 function CartContent() {
+  const colors = useAppColors();
+  const styles = getStyles(colors);
   const { items, totalItems, totalPrice, updateQuantity, removeFromCart, clearCart, deliverySchedule, setDeliverySchedule } = useCart();
   const [showDeliveryScheduler, setShowDeliveryScheduler] = useState(false);
   const insets = useSafeAreaInsets();
@@ -78,21 +101,20 @@ function CartContent() {
       return;
     }
     
-    // Ir directamente al pago si ya hay programación de entrega
     router.push('/payments');
   };
 
-  const renderCartItem = ({ item }: { item: any }) => (
+  const renderCartItem = ({ item }: { item: CartItem }) => (
     <View style={styles.cartItem}>
       <ProductImage 
-        source={{ uri: item.product.image }} 
+        source={{ uri: item.product.image || '' }} 
         style={styles.productImage}
         fallbackIcon="bag-outline"
-        fallbackColor={Colors.light.primary}
+        fallbackColor={colors.primary}
       />
       <View style={styles.itemInfo}>
         <Text style={styles.productName} numberOfLines={2}>{item.product.name}</Text>
-        <Text style={styles.productPrice}>S/ {(item.unitPrice ?? item.product.price).toFixed(2)}</Text>
+        <Text style={styles.productPrice}>S/ {(item.unitPrice ?? 0).toFixed(2)}</Text>
         <Text style={styles.productCategory}>{item.product.category}</Text>
         
         <View style={styles.quantityContainer}>
@@ -100,7 +122,7 @@ function CartContent() {
             style={styles.quantityButton}
             onPress={() => handleQuantityChange(item.product.id, item.quantity - 1)}
           >
-            <Ionicons name="remove" size={ThemeDimensions.isSmallScreen ? 14 : 16} color={Colors.light.primary} />
+            <Ionicons name="remove" size={ThemeDimensions.isSmallScreen ? 14 : 16} color={colors.primary} />
           </TouchableOpacity>
           
           <TextInput
@@ -115,98 +137,117 @@ function CartContent() {
             style={styles.quantityButton}
             onPress={() => handleQuantityChange(item.product.id, item.quantity + 1)}
           >
-            <Ionicons name="add" size={ThemeDimensions.isSmallScreen ? 14 : 16} color={Colors.light.primary} />
+            <Ionicons name="add" size={ThemeDimensions.isSmallScreen ? 14 : 16} color={colors.primary} />
           </TouchableOpacity>
         </View>
       </View>
       
       <View style={styles.itemActions}>
         <Text style={styles.itemTotal}>
-          S/ {(item.subtotal ?? (item.unitPrice ?? item.product.price) * item.quantity).toFixed(2)}
+          S/ {(item.unitPrice * item.quantity).toFixed(2)}
         </Text>
         <TouchableOpacity
           style={styles.removeButton}
           onPress={() => handleRemoveItem(item.product.id, item.product.name)}
         >
-          <Ionicons name="trash-outline" size={ThemeDimensions.isSmallScreen ? 18 : 20} color={Colors.light.error} />
+          <Ionicons name="trash-outline" size={ThemeDimensions.isSmallScreen ? 18 : 20} color={colors.error} />
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  if (items.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="cart-outline" size={ThemeDimensions.isSmallScreen ? 64 : 80} color={Colors.light.textLight} />
-        <Text style={styles.emptyTitle}>Tu carrito está vacío</Text>
-        <Text style={styles.emptySubtitle}>
-          Agrega algunos productos para comenzar
-        </Text>
-      </View>
-    );
-  }
+  const renderEmptyCart = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="cart-outline" size={ThemeDimensions.isSmallScreen ? 64 : 80} color={colors.textLight} />
+      <Text style={styles.emptyTitle}>Tu carrito está vacío</Text>
+      <Text style={styles.emptySubtitle}>
+        Explora el catálogo y agrega productos para comenzar tus compras.
+      </Text>
+    </View>
+  );
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm, paddingHorizontal: horizontalPadding }]}>
-        <Text style={[styles.title, { fontSize: scaleFont(22) }]}>Carrito de Compras</Text>
-        <TouchableOpacity style={styles.clearButton} onPress={handleClearCart}>
-          <Ionicons name="trash-outline" size={ThemeDimensions.isSmallScreen ? 18 : 20} color={Colors.light.error} />
-          <Text style={styles.clearButtonText}>Vaciar</Text>
-        </TouchableOpacity>
-      </View>
-
-      <FlatList
-        data={items}
-        renderItem={renderCartItem}
-        keyExtractor={(item) => item.product.id}
-        contentContainerStyle={styles.cartList}
-        showsVerticalScrollIndicator={false}
-      />
-
-      <View style={styles.footer}>
-        {/* Información de entrega programada */}
-        {deliverySchedule && (
-          <View style={styles.deliveryInfo}>
-            <View style={styles.deliveryHeader}>
-              <Ionicons name="calendar" size={ThemeDimensions.isSmallScreen ? 14 : 16} color={Colors.light.primary} />
-              <Text style={styles.deliveryTitle}>Entrega Programada</Text>
-              <TouchableOpacity onPress={() => setShowDeliveryScheduler(true)}>
-                <Ionicons name="create-outline" size={ThemeDimensions.isSmallScreen ? 14 : 16} color={Colors.light.primary} />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.deliveryDate}>{deliverySchedule.date}</Text>
-            <Text style={styles.deliveryTime}>{deliverySchedule.timeSlot}</Text>
-            <Text style={styles.deliveryAddress}>{deliverySchedule.address}</Text>
-          </View>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+      <View style={[styles.header, { paddingTop: insets.top, paddingHorizontal: horizontalPadding }]}>
+        <Text style={styles.title}>Carrito de Compras</Text>
+        {items.length > 0 && (
+          <TouchableOpacity style={styles.clearButton} onPress={handleClearCart}>
+            <Ionicons name="trash-outline" size={ThemeDimensions.isSmallScreen ? 18 : 20} color={colors.error} />
+            <Text style={styles.clearButtonText}>Vaciar</Text>
+          </TouchableOpacity>
         )}
-
-        <View style={styles.summary}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Total de productos:</Text>
-            <Text style={styles.summaryValue}>{totalItems}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal:</Text>
-            <Text style={styles.summaryValue}>S/ {totalPrice.toFixed(2)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Envío:</Text>
-            <Text style={styles.summaryValue}>{shippingFee > 0 ? `S/ ${shippingFee.toFixed(2)}` : 'Gratis'}</Text>
-          </View>
-          <View style={[styles.summaryRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Total:</Text>
-            <Text style={styles.totalValue}>S/ {(totalPrice + shippingFee).toFixed(2)}</Text>
-          </View>
-        </View>
-
-        <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout}>
-          <Text style={styles.checkoutButtonText}>Proceder al Pago</Text>
-          <Ionicons name="arrow-forward" size={ThemeDimensions.isSmallScreen ? 18 : 20} color={Colors.light.background} />
-        </TouchableOpacity>
       </View>
 
-      {/* Modal del programador de entrega */}
+      {items.length === 0 ? (
+        renderEmptyCart()
+      ) : (
+        <>
+          <FlatList
+            data={items}
+            renderItem={renderCartItem}
+            keyExtractor={(item) => item.product.id}
+            contentContainerStyle={styles.cartList}
+            showsVerticalScrollIndicator={false}
+          />
+
+          <View style={styles.footer}>
+            {deliverySchedule ? (
+              <View style={styles.deliveryInfo}>
+                <View style={styles.deliveryHeader}>
+                  <Ionicons name="calendar" size={ThemeDimensions.isSmallScreen ? 14 : 16} color={colors.primary} />
+                  <Text style={styles.deliveryTitle}>Entrega Programada</Text>
+                  <TouchableOpacity onPress={() => setShowDeliveryScheduler(true)}>
+                    <Ionicons name="create-outline" size={ThemeDimensions.isSmallScreen ? 14 : 16} color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.deliveryDate}>
+                  {formatDateForDisplay(deliverySchedule.date)}
+                </Text>
+                <Text style={styles.deliveryTime}>
+                  Horario: {deliverySchedule.timeSlot}
+                </Text>
+                <Text style={styles.deliveryAddress} numberOfLines={2}>
+                  Dirección: {deliverySchedule.address}
+                </Text>
+              </View>
+            ) : (
+              <AppButton
+                label="Programar Entrega"
+                onPress={() => setShowDeliveryScheduler(true)}
+                style={{ marginBottom: Spacing.md }}
+              />
+            )}
+
+            <View style={styles.summary}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Subtotal</Text>
+                <Text style={styles.summaryValue}>S/ {totalPrice.toFixed(2)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Envío</Text>
+                <Text style={styles.summaryValue}>
+                  {shippingFee === 0 ? 'Gratis' : `S/ ${shippingFee.toFixed(2)}`}
+                </Text>
+              </View>
+              <View style={[styles.summaryRow, styles.totalRow]}>
+                <Text style={styles.totalLabel}>Total</Text>
+                <Text style={styles.totalValue}>
+                  S/ {(totalPrice + shippingFee).toFixed(2)}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.checkoutButton}
+              onPress={handleCheckout}
+            >
+              <Text style={styles.checkoutButtonText}>Proceder al Pago</Text>
+              <Ionicons name="arrow-forward" size={ThemeDimensions.isSmallScreen ? 18 : 20} color={colors.background} />
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+
       <DeliveryScheduler
         visible={showDeliveryScheduler}
         onClose={() => setShowDeliveryScheduler(false)}
@@ -229,25 +270,25 @@ function CartContent() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: Spacing.md,
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: colors.border,
     ...Shadows.sm,
   },
   title: {
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.xl : FontSizes.xxl,
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
     flex: 1,
   },
   clearButton: {
@@ -256,7 +297,7 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
   clearButtonText: {
-    color: Colors.light.error,
+    color: colors.error,
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
     marginLeft: Spacing.xs,
     fontWeight: '500',
@@ -266,7 +307,7 @@ const styles = StyleSheet.create({
   },
   cartItem: {
     flexDirection: 'row',
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     marginBottom: Spacing.md,
@@ -285,18 +326,18 @@ const styles = StyleSheet.create({
   productName: {
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.xs,
   },
   productPrice: {
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
-    color: Colors.light.success,
+    color: colors.success,
     fontWeight: '600',
     marginBottom: Spacing.xs,
   },
   productCategory: {
     fontSize: FontSizes.xs,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginBottom: Spacing.sm,
   },
   quantityContainer: {
@@ -308,16 +349,16 @@ const styles = StyleSheet.create({
     width: ThemeDimensions.isSmallScreen ? 28 : 32,
     height: ThemeDimensions.isSmallScreen ? 28 : 32,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   quantityText: {
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
     marginHorizontal: Spacing.md,
     minWidth: 20,
     textAlign: 'center',
@@ -325,16 +366,16 @@ const styles = StyleSheet.create({
   quantityInput: {
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
     marginHorizontal: Spacing.xs,
     minWidth: ThemeDimensions.isSmallScreen ? 40 : 50,
     textAlign: 'center',
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
     borderRadius: BorderRadius.sm,
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.sm,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
   },
   itemActions: {
     alignItems: 'flex-end',
@@ -344,27 +385,27 @@ const styles = StyleSheet.create({
   itemTotal: {
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.sm,
   },
   removeButton: {
     padding: Spacing.sm,
   },
   footer: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: colors.border,
     ...Shadows.md,
   },
   deliveryInfo: {
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.md,
     borderLeftWidth: 4,
-    borderLeftColor: Colors.light.primary,
+    borderLeftColor: colors.primary,
   },
   deliveryHeader: {
     flexDirection: 'row',
@@ -374,24 +415,24 @@ const styles = StyleSheet.create({
   deliveryTitle: {
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
     marginLeft: Spacing.sm,
     flex: 1,
   },
   deliveryDate: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginBottom: Spacing.xs,
     fontWeight: '500',
   },
   deliveryTime: {
     fontSize: FontSizes.sm,
-    color: Colors.light.primary,
+    color: colors.primary,
     marginBottom: Spacing.xs,
   },
   deliveryAddress: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 20,
   },
   summary: {
@@ -404,41 +445,41 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   summaryValue: {
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
-    color: Colors.light.text,
+    color: colors.text,
     fontWeight: '500',
   },
   totalRow: {
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: colors.border,
     paddingTop: Spacing.sm,
     marginTop: Spacing.sm,
   },
   totalLabel: {
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.md : FontSizes.lg,
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
   },
   totalValue: {
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.md : FontSizes.lg,
     fontWeight: 'bold',
-    color: Colors.light.success,
+    color: colors.success,
   },
   checkoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     borderRadius: BorderRadius.lg,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     minHeight: ThemeDimensions.isSmallScreen ? 48 : 50,
   },
   checkoutButtonText: {
-    color: Colors.light.background,
+    color: colors.background,
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.md : FontSizes.lg,
     fontWeight: '600',
     marginRight: Spacing.sm,
@@ -447,19 +488,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     padding: Spacing.xl,
   },
   emptyTitle: {
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.xl : FontSizes.xxl,
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
     marginTop: Spacing.lg,
     marginBottom: Spacing.sm,
   },
   emptySubtitle: {
     fontSize: ThemeDimensions.isSmallScreen ? FontSizes.sm : FontSizes.md,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     paddingHorizontal: Spacing.lg,
   },

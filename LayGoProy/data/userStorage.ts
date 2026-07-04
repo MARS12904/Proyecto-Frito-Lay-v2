@@ -2,13 +2,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface PaymentMethod {
   id: string;
-  type: 'card' | 'transfer' | 'cash' | 'credit';
+  type: 'card' | 'yape' | 'plin' | 'transfer' | 'deposit' | 'cash' | 'credit';
   name: string;
   details?: {
     cardNumber?: string;
     expiryDate?: string;
     bank?: string;
     accountNumber?: string;
+    cci?: string;
+    walletPhone?: string;
+    documentType?: 'dni' | 'ruc' | 'ce';
+    documentNumber?: string;
+    holderName?: string;
   };
   isDefault?: boolean;
 }

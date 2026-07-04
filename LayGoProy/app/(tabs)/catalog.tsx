@@ -21,12 +21,15 @@ import { useStock } from '../../contexts/StockContext';
 import { getProductsByCategory, Product, productCategories, products as localProducts, searchProducts } from '../../data/products';
 import { productsService } from '../../services/productsService';
 import { useResponsive } from '../../hooks/useResponsive';
+import { useAppColors } from '../../contexts/ThemeContext';
 
 export default function CatalogScreen() {
   return <CatalogContent />;
 }
 
 function CatalogContent() {
+  const colors = useAppColors();
+  const styles = getStyles(colors);
   const [allProducts, setAllProducts] = useState<Product[]>(localProducts);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>(localProducts);
   const [selectedCategory, setSelectedCategory] = useState('Todos');
@@ -46,15 +49,10 @@ function CatalogContent() {
     try {
       const supabaseProducts = await productsService.getAllProducts();
       
-      if (supabaseProducts.length > 0) {
-        // Usar SOLO productos de Supabase si hay conexión
-        // Esto evita duplicados ya que los productos locales son solo un fallback
+      if (supabaseProducts.length >= localProducts.length) {
         setAllProducts(supabaseProducts);
-        console.log(`📦 Productos cargados: ${supabaseProducts.length} desde Supabase`);
       } else {
-        // Si no hay productos en Supabase, usar solo locales como fallback
         setAllProducts(localProducts);
-        console.log(`📦 Usando ${localProducts.length} productos locales (fallback)`);
       }
     } catch (error) {
       console.error('Error cargando productos:', error);
@@ -216,7 +214,7 @@ function CatalogContent() {
             source={{ uri: item.image }} 
             style={styles.productImage}
             fallbackIcon="bag-outline"
-            fallbackColor={Colors.light.primary}
+            fallbackColor={colors.primary}
           />
           {productStock === 0 && (
             <View style={styles.unavailableOverlay}>
@@ -274,7 +272,7 @@ function CatalogContent() {
             <Ionicons 
               name={isInCartItem ? "checkmark" : "add"} 
               size={20} 
-              color={Colors.light.background} 
+              color={colors.background} 
             />
             <Text style={styles.addButtonText}>
               {isInCartItem ? 'En carrito' : 'Agregar'}
@@ -310,11 +308,11 @@ function CatalogContent() {
           Catálogo Frito-Lay
         </Text>
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color={Colors.light.textSecondary} style={styles.searchIcon} />
+          <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Buscar productos..."
-            placeholderTextColor={Colors.light.textLight}
+            placeholderTextColor={colors.textLight}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -334,7 +332,7 @@ function CatalogContent() {
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.light.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Cargando productos...</Text>
         </View>
       ) : (
@@ -350,13 +348,13 @@ function CatalogContent() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={[Colors.light.primary]}
-              tintColor={Colors.light.primary}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
             />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="cube-outline" size={64} color={Colors.light.textLight} />
+              <Ionicons name="cube-outline" size={64} color={colors.textLight} />
               <Text style={styles.emptyText}>No hay productos disponibles</Text>
               <Text style={styles.emptySubtext}>Desliza hacia abajo para refrescar</Text>
             </View>
@@ -388,7 +386,7 @@ function CatalogContent() {
                 <Ionicons 
                   name="remove" 
                   size={20} 
-                  color={quantity <= 1 ? Colors.light.textLight : Colors.light.primary} 
+                  color={quantity <= 1 ? colors.textLight : colors.primary} 
                 />
               </TouchableOpacity>
               
@@ -408,7 +406,7 @@ function CatalogContent() {
                 style={styles.quantityButton}
                 onPress={() => handleQuantityChange(1)}
               >
-                <Ionicons name="add" size={20} color={Colors.light.primary} />
+                <Ionicons name="add" size={20} color={colors.primary} />
               </TouchableOpacity>
             </View>
 
@@ -448,30 +446,30 @@ function CatalogContent() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
   },
   header: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     padding: Spacing.lg,
     ...Shadows.sm,
   },
   title: {
     fontSize: FontSizes.xxxl,
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.md,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   searchIcon: {
     marginRight: Spacing.sm,
@@ -480,13 +478,13 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 40,
     fontSize: FontSizes.md,
-    color: Colors.light.text,
+    color: colors.text,
   },
   categoriesContainer: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: colors.border,
   },
   categoriesList: {
     paddingHorizontal: Spacing.lg,
@@ -498,13 +496,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
     marginRight: Spacing.sm,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   categoryButtonActive: {
-    backgroundColor: Colors.light.primary,
-    borderColor: Colors.light.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   categoryIcon: {
     fontSize: FontSizes.md,
@@ -512,11 +510,11 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   categoryTextActive: {
-    color: Colors.light.background,
+    color: colors.background,
   },
   productsList: {
     padding: Dimensions.isSmallScreen ? Spacing.md : Spacing.lg,
@@ -549,7 +547,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   unavailableText: {
-    color: Colors.light.background,
+    color: colors.background,
     fontWeight: 'bold',
     fontSize: FontSizes.sm,
   },
@@ -557,13 +555,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing.xs,
     right: Spacing.xs,
-    backgroundColor: Colors.light.success,
+    backgroundColor: colors.success,
     paddingHorizontal: Spacing.xs,
     paddingVertical: 2,
     borderRadius: BorderRadius.sm,
   },
   savingsText: {
-    color: Colors.light.background,
+    color: colors.background,
     fontSize: FontSizes.xs,
     fontWeight: 'bold',
   },
@@ -578,22 +576,22 @@ const styles = StyleSheet.create({
   },
   productBrand: {
     fontSize: FontSizes.xs,
-    color: Colors.light.primary,
+    color: colors.primary,
     fontWeight: '600',
   },
   productWeight: {
     fontSize: FontSizes.xs,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   productName: {
     fontSize: FontSizes.md,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.xs,
   },
   productDescription: {
     fontSize: FontSizes.xs,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginBottom: Spacing.xs,
     lineHeight: 16,
   },
@@ -603,7 +601,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   tag: {
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     paddingHorizontal: Spacing.xs,
     paddingVertical: 2,
     borderRadius: BorderRadius.sm,
@@ -612,7 +610,7 @@ const styles = StyleSheet.create({
   },
   tagText: {
     fontSize: FontSizes.xs,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   productFooter: {
     marginBottom: Spacing.sm,
@@ -627,31 +625,31 @@ const styles = StyleSheet.create({
   productPrice: {
     fontSize: FontSizes.lg,
     fontWeight: 'bold',
-    color: Colors.light.success,
+    color: colors.success,
   },
   originalPrice: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textLight,
+    color: colors.textLight,
     textDecorationLine: 'line-through',
   },
   productStock: {
     fontSize: FontSizes.xs,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     borderRadius: BorderRadius.md,
     paddingVertical: Spacing.sm,
   },
   addButtonDisabled: {
-    backgroundColor: Colors.light.border,
+    backgroundColor: colors.border,
   },
   addButtonText: {
-    color: Colors.light.background,
+    color: colors.background,
     fontSize: FontSizes.sm,
     fontWeight: '600',
     marginLeft: Spacing.xs,
@@ -664,7 +662,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     width: '80%',
@@ -674,19 +672,19 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: FontSizes.xl,
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
     textAlign: 'center',
     marginBottom: Spacing.sm,
   },
   modalProductName: {
     fontSize: FontSizes.md,
-    color: Colors.light.text,
+    color: colors.text,
     textAlign: 'center',
     marginBottom: Spacing.xs,
   },
   modalPrice: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: Spacing.lg,
   },
@@ -700,16 +698,16 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.light.primary,
+    borderColor: colors.primary,
   },
   quantityText: {
     fontSize: FontSizes.xl,
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
     marginHorizontal: Spacing.lg,
     minWidth: 40,
     textAlign: 'center',
@@ -717,29 +715,29 @@ const styles = StyleSheet.create({
   quantityInput: {
     fontSize: FontSizes.xl,
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
     marginHorizontal: Spacing.md,
     minWidth: 60,
     textAlign: 'center',
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
     borderRadius: BorderRadius.md,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
   },
   minOrderHint: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: Spacing.md,
   },
   minOrderHintWarning: {
-    color: Colors.light.error,
+    color: colors.error,
     fontWeight: '600',
   },
   quantityInputWarning: {
-    borderColor: Colors.light.error,
+    borderColor: colors.error,
     borderWidth: 2,
   },
   quantityButtonDisabled: {
@@ -748,7 +746,7 @@ const styles = StyleSheet.create({
   totalText: {
     fontSize: FontSizes.lg,
     fontWeight: 'bold',
-    color: Colors.light.success,
+    color: colors.success,
     textAlign: 'center',
     marginBottom: Spacing.lg,
   },
@@ -758,24 +756,24 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
     alignItems: 'center',
   },
   cancelButtonText: {
-    color: Colors.light.text,
+    color: colors.text,
     fontWeight: '600',
   },
   confirmButton: {
     flex: 1,
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
     alignItems: 'center',
   },
   confirmButtonText: {
-    color: Colors.light.background,
+    color: colors.background,
     fontWeight: '600',
   },
   loadingContainer: {
@@ -787,7 +785,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: Spacing.md,
     fontSize: FontSizes.md,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   emptyContainer: {
     flex: 1,
@@ -799,11 +797,11 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     fontSize: FontSizes.lg,
     fontWeight: '600',
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   emptySubtext: {
     marginTop: Spacing.xs,
     fontSize: FontSizes.sm,
-    color: Colors.light.textLight,
+    color: colors.textLight,
   },
 });

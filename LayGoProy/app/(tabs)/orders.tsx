@@ -15,6 +15,7 @@ import { useOrders } from '../../contexts/OrdersContext';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '../../constants/theme';
 import { useResponsive } from '../../hooks/useResponsive';
 import { formatOrderLabel } from '../../utils/format';
+import { useAppColors } from '../../contexts/ThemeContext';
 
 // Función para parsear fecha YYYY-MM-DD sin problemas de zona horaria
 const parseLocalDate = (dateStr: string): Date => {
@@ -134,19 +135,21 @@ const mockOrders: Order[] = [
 ];
 
 const statusConfig = {
-  pending: { color: Colors.light.warning, label: 'Pendiente', icon: 'time', description: 'Esperando confirmación' },
-  confirmed: { color: Colors.light.info, label: 'Confirmado', icon: 'checkmark-circle', description: 'Pedido confirmado' },
-  preparing: { color: Colors.light.primary, label: 'Preparando', icon: 'cog', description: 'Preparando pedido' },
-  shipped: { color: Colors.light.secondary, label: 'Enviado', icon: 'car', description: 'En camino' },
-  delivered: { color: Colors.light.success, label: 'Entregado', icon: 'checkmark-done', description: 'Entregado exitosamente' },
-  cancelled: { color: Colors.light.error, label: 'Cancelado', icon: 'close-circle', description: 'Pedido cancelado' },
-};
+  pending: { colorKey: 'warning', label: 'Pendiente', icon: 'time', description: 'Esperando confirmación' },
+  confirmed: { colorKey: 'info', label: 'Confirmado', icon: 'checkmark-circle', description: 'Pedido confirmado' },
+  preparing: { colorKey: 'primary', label: 'Preparando', icon: 'cog', description: 'Preparando pedido' },
+  shipped: { colorKey: 'secondary', label: 'Enviado', icon: 'car', description: 'En camino' },
+  delivered: { colorKey: 'success', label: 'Entregado', icon: 'checkmark-done', description: 'Entregado exitosamente' },
+  cancelled: { colorKey: 'error', label: 'Cancelado', icon: 'close-circle', description: 'Pedido cancelado' },
+} as const;
 
 export default function OrdersScreen() {
   return <OrdersContent />;
 }
 
 function OrdersContent() {
+  const colors = useAppColors();
+  const styles = getStyles(colors);
   const { headerPaddingTop, scaleFont } = useResponsive();
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -226,13 +229,13 @@ function OrdersContent() {
             </Text>
             {item.isWholesale && (
               <View style={styles.wholesaleBadge}>
-                <Ionicons name="business" size={12} color={Colors.light.primary} />
+                <Ionicons name="business" size={12} color={colors.primary} />
                 <Text style={styles.wholesaleText}>Mayorista</Text>
               </View>
             )}
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: status.color }]}>
-            <Ionicons name={status.icon as any} size={14} color={Colors.light.background} />
+          <View style={[styles.statusBadge, { backgroundColor: colors[status.colorKey] }]}>
+            <Ionicons name={status.icon as any} size={14} color={colors.background} />
             <Text style={styles.statusText}>{status.label}</Text>
           </View>
         </View>
@@ -278,7 +281,7 @@ function OrdersContent() {
                 style={styles.reorderButton}
                 onPress={() => handleReorder(item)}
               >
-                <Ionicons name="refresh" size={14} color={Colors.light.primary} />
+                <Ionicons name="refresh" size={14} color={colors.primary} />
                 <Text style={styles.reorderButtonText}>Reordenar</Text>
               </TouchableOpacity>
             )}
@@ -327,13 +330,10 @@ function OrdersContent() {
 
       {filteredOrders.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="receipt-outline" size={80} color={Colors.light.textLight} />
-          <Text style={styles.emptyTitle}>No hay pedidos</Text>
+          <Ionicons name="receipt-outline" size={80} color={colors.textLight} />
+          <Text style={styles.emptyTitle}>No tienes pedidos</Text>
           <Text style={styles.emptySubtitle}>
-            {selectedFilter === 'all' 
-              ? 'Aún no has realizado ningún pedido de reabastecimiento'
-              : `No hay pedidos con estado "${statusConfig[selectedFilter as keyof typeof statusConfig]?.label}"`
-            }
+            Realiza tu primera compra desde el carrito para ver el historial aquí.
           </Text>
         </View>
       ) : (
@@ -360,7 +360,7 @@ function OrdersContent() {
                 style={styles.closeButton}
                 onPress={() => setShowOrderDetails(false)}
               >
-                <Ionicons name="close" size={24} color={Colors.light.text} />
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Detalles del Pedido</Text>
               <View style={styles.modalSpacer} />
@@ -372,8 +372,8 @@ function OrdersContent() {
                   <Text style={styles.orderDetailsId} numberOfLines={1}>
                     Pedido {formatOrderLabel(selectedOrder.id)}
                   </Text>
-                  <View style={[styles.statusBadge, { backgroundColor: statusConfig[selectedOrder.status].color }]}>
-                    <Ionicons name={statusConfig[selectedOrder.status].icon as any} size={16} color={Colors.light.background} />
+                  <View style={[styles.statusBadge, { backgroundColor: colors[statusConfig[selectedOrder.status].colorKey] }]}>
+                    <Ionicons name={statusConfig[selectedOrder.status].icon as any} size={16} color={colors.background} />
                     <Text style={styles.statusText}>{statusConfig[selectedOrder.status].label}</Text>
                   </View>
                 </View>
@@ -384,7 +384,7 @@ function OrdersContent() {
 
                 <View style={styles.orderDetailsInfo}>
                   <View style={styles.infoRow}>
-                    <Ionicons name="calendar" size={16} color={Colors.light.primary} />
+                    <Ionicons name="calendar" size={16} color={colors.primary} />
                     <Text style={styles.infoLabel}>Fecha del pedido:</Text>
                     <Text style={styles.infoValue}>
                       {formatDate(selectedOrder.date, {
@@ -398,7 +398,7 @@ function OrdersContent() {
 
                   {selectedOrder.deliveryDate && (
                     <View style={styles.infoRow}>
-                      <Ionicons name="car" size={16} color={Colors.light.primary} />
+                      <Ionicons name="car" size={16} color={colors.primary} />
                       <Text style={styles.infoLabel}>Fecha de entrega:</Text>
                       <Text style={styles.infoValue}>
                         {formatDate(selectedOrder.deliveryDate, {
@@ -413,21 +413,21 @@ function OrdersContent() {
 
                   {selectedOrder.deliveryAddress && (
                     <View style={styles.infoRow}>
-                      <Ionicons name="location" size={16} color={Colors.light.primary} />
+                      <Ionicons name="location" size={16} color={colors.primary} />
                       <Text style={styles.infoLabel}>Dirección:</Text>
                       <Text style={styles.infoValue}>{selectedOrder.deliveryAddress}</Text>
                     </View>
                   )}
 
                   <View style={styles.infoRow}>
-                    <Ionicons name="card" size={16} color={Colors.light.primary} />
+                    <Ionicons name="card" size={16} color={colors.primary} />
                     <Text style={styles.infoLabel}>Método de pago:</Text>
                     <Text style={styles.infoValue}>{selectedOrder.paymentMethod}</Text>
                   </View>
 
                   {selectedOrder.trackingNumber && (
                     <View style={styles.infoRow}>
-                      <Ionicons name="barcode" size={16} color={Colors.light.primary} />
+                      <Ionicons name="barcode" size={16} color={colors.primary} />
                       <Text style={styles.infoLabel}>Número de seguimiento:</Text>
                       <Text style={styles.infoValue}>{selectedOrder.trackingNumber}</Text>
                     </View>
@@ -486,7 +486,7 @@ function OrdersContent() {
                   style={styles.reorderButton}
                   onPress={() => handleReorder(selectedOrder)}
                 >
-                  <Ionicons name="refresh" size={16} color={Colors.light.primary} />
+                  <Ionicons name="refresh" size={16} color={colors.primary} />
                   <Text style={styles.reorderButtonText}>Reordenar</Text>
                 </TouchableOpacity>
               )}
@@ -498,31 +498,31 @@ function OrdersContent() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
   },
   header: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     padding: Spacing.lg,
     ...Shadows.sm,
   },
   title: {
     fontSize: FontSizes.xxxl,
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.xs,
   },
   subtitle: {
     fontSize: FontSizes.md,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   filtersContainer: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: colors.border,
   },
   filtersList: {
     paddingHorizontal: Spacing.lg,
@@ -532,27 +532,27 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
     marginRight: Spacing.sm,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   filterButtonActive: {
-    backgroundColor: Colors.light.primary,
-    borderColor: Colors.light.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   filterText: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   filterTextActive: {
-    color: Colors.light.background,
+    color: colors.background,
   },
   ordersList: {
     padding: Spacing.lg,
   },
   orderCard: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
@@ -572,18 +572,18 @@ const styles = StyleSheet.create({
   orderId: {
     fontSize: FontSizes.md,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
     flexShrink: 1,
   },
   orderDate: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginTop: Spacing.xs,
   },
   wholesaleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     paddingHorizontal: Spacing.xs,
     paddingVertical: 2,
     borderRadius: BorderRadius.sm,
@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
   },
   wholesaleText: {
     fontSize: FontSizes.xs,
-    color: Colors.light.primary,
+    color: colors.primary,
     marginLeft: Spacing.xs,
     fontWeight: '500',
   },
@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   statusText: {
-    color: Colors.light.background,
+    color: colors.background,
     fontSize: FontSizes.xs,
     fontWeight: '600',
     marginLeft: Spacing.xs,
@@ -625,12 +625,12 @@ const styles = StyleSheet.create({
   },
   itemName: {
     fontSize: FontSizes.sm,
-    color: Colors.light.text,
+    color: colors.text,
     fontWeight: '500',
   },
   itemBrand: {
     fontSize: FontSizes.xs,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   itemDetails: {
@@ -638,17 +638,17 @@ const styles = StyleSheet.create({
   },
   itemQuantity: {
     fontSize: FontSizes.xs,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginBottom: Spacing.xs,
   },
   itemPrice: {
     fontSize: FontSizes.sm,
-    color: Colors.light.text,
+    color: colors.text,
     fontWeight: '600',
   },
   moreItemsText: {
     fontSize: FontSizes.xs,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: Spacing.xs,
@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: colors.border,
     paddingTop: Spacing.sm,
   },
   totalInfo: {
@@ -667,11 +667,11 @@ const styles = StyleSheet.create({
   orderTotal: {
     fontSize: FontSizes.lg,
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
   },
   savingsText: {
     fontSize: FontSizes.xs,
-    color: Colors.light.success,
+    color: colors.success,
     marginTop: 2,
   },
   orderActions: {
@@ -683,10 +683,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
-    borderColor: Colors.light.error,
+    borderColor: colors.error,
   },
   cancelButtonText: {
-    color: Colors.light.error,
+    color: colors.error,
     fontSize: FontSizes.xs,
     fontWeight: '600',
   },
@@ -697,11 +697,11 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
-    borderColor: Colors.light.primary,
+    borderColor: colors.primary,
     gap: Spacing.xs,
   },
   reorderButtonText: {
-    color: Colors.light.primary,
+    color: colors.primary,
     fontSize: FontSizes.xs,
     fontWeight: '600',
   },
@@ -714,29 +714,29 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: FontSizes.xxl,
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
     marginTop: Spacing.lg,
     marginBottom: Spacing.sm,
   },
   emptySubtitle: {
     fontSize: FontSizes.md,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
   },
   // Modal styles
   modalContainer: {
     flex: 1,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: Spacing.lg,
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: colors.border,
   },
   closeButton: {
     padding: Spacing.sm,
@@ -744,7 +744,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: FontSizes.lg,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
   },
   modalSpacer: {
     width: 40,
@@ -754,7 +754,7 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
   },
   orderDetailsCard: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     marginBottom: Spacing.lg,
@@ -769,11 +769,11 @@ const styles = StyleSheet.create({
   orderDetailsId: {
     fontSize: FontSizes.lg,
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
   },
   orderDetailsDescription: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginBottom: Spacing.lg,
   },
   orderDetailsInfo: {
@@ -786,17 +786,17 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     minWidth: 120,
   },
   infoValue: {
     fontSize: FontSizes.sm,
-    color: Colors.light.text,
+    color: colors.text,
     fontWeight: '500',
     flex: 1,
   },
   productsCard: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     marginBottom: Spacing.lg,
@@ -805,7 +805,7 @@ const styles = StyleSheet.create({
   productsTitle: {
     fontSize: FontSizes.lg,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.md,
   },
   productItem: {
@@ -814,19 +814,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: colors.border,
   },
   productInfo: {
     flex: 1,
   },
   productName: {
     fontSize: FontSizes.md,
-    color: Colors.light.text,
+    color: colors.text,
     fontWeight: '500',
   },
   productBrand: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   productDetails: {
@@ -834,16 +834,16 @@ const styles = StyleSheet.create({
   },
   productQuantity: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginBottom: Spacing.xs,
   },
   productPrice: {
     fontSize: FontSizes.md,
-    color: Colors.light.text,
+    color: colors.text,
     fontWeight: '600',
   },
   summaryCard: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     ...Shadows.sm,
@@ -851,7 +851,7 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: FontSizes.lg,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.md,
   },
   summaryRow: {
@@ -862,46 +862,46 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   summaryValue: {
     fontSize: FontSizes.sm,
-    color: Colors.light.text,
+    color: colors.text,
     fontWeight: '500',
   },
   savingsValue: {
-    color: Colors.light.success,
+    color: colors.success,
   },
   totalRow: {
     marginTop: Spacing.sm,
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: colors.border,
   },
   totalLabel: {
     fontSize: FontSizes.lg,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
   },
   totalValue: {
     fontSize: FontSizes.lg,
     fontWeight: 'bold',
-    color: Colors.light.success,
+    color: colors.success,
   },
   modalFooter: {
     padding: Spacing.lg,
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: colors.border,
   },
   cancelOrderButton: {
-    backgroundColor: Colors.light.error,
+    backgroundColor: colors.error,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
     alignItems: 'center',
   },
   cancelOrderButtonText: {
-    color: Colors.light.background,
+    color: colors.background,
     fontSize: FontSizes.md,
     fontWeight: '600',
   },
