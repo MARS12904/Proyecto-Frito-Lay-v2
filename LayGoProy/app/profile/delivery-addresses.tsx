@@ -12,19 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import * as Location from 'expo-location';
-
-let MapView: any = null;
-let Marker: any = null;
-
-if (Platform.OS !== 'web') {
-  try {
-    const Maps = require('react-native-maps');
-    MapView = Maps.default;
-    Marker = Maps.Marker;
-  } catch (e) {
-    console.error('Error loading react-native-maps:', e);
-  }
-}
+import MapView, { Marker } from '../../components/MapViewWrapper';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../contexts/AuthContext';
@@ -87,6 +75,34 @@ const resolveZoneFromCoordinates = (x: number, y: number, width: number, height:
 
 const getZoneDisplayName = (zoneId: string) => {
   return deliveryAreas.find(area => area.id === zoneId)?.name || zoneId;
+};
+
+const getSimulatedCoordinatesFromGPS = (lat: number, lon: number) => {
+  const minLat = -11.95;
+  const maxLat = -12.20;
+  const minLon = -77.15;
+  const maxLon = -76.90;
+  
+  let x = 125;
+  let y = 100;
+  
+  if (lat >= maxLat && lat <= minLat) {
+    y = 20 + ((lat - minLat) / (maxLat - minLat)) * 160;
+  } else if (lat < maxLat) {
+    y = 180;
+  } else {
+    y = 20;
+  }
+  
+  if (lon >= minLon && lon <= maxLon) {
+    x = 20 + ((lon - minLon) / (maxLon - minLon)) * 210;
+  } else if (lon < minLon) {
+    x = 20;
+  } else {
+    x = 230;
+  }
+  
+  return { x: Math.round(x), y: Math.round(y) };
 };
 
 
@@ -453,6 +469,63 @@ export default function DeliveryAddressesScreen() {
     setSuggestions([]);
   };
 
+  const handleRealSearch = async () => {
+    if (!searchQuery.trim()) return;
+    
+    setIsLocating(true);
+    try {
+      let searchString = searchQuery.trim();
+      if (!searchString.toLowerCase().includes('lima') && !searchString.toLowerCase().includes('callao')) {
+        searchString += ', Lima, Perú';
+      }
+      
+      const results = await Location.geocodeAsync(searchString);
+      if (results && results.length > 0) {
+        const { latitude, longitude } = results[0];
+        setMarkerCoords({ latitude, longitude });
+        
+        const simCoords = getSimulatedCoordinatesFromGPS(latitude, longitude);
+        setMarkerPos(simCoords);
+        
+        const geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+        if (geocode && geocode.length > 0) {
+          const place = geocode[0];
+          const street = place.street || '';
+          const number = place.name || '';
+          const district = place.district || place.city || '';
+          
+          let fullAddress = street;
+          if (number && !fullAddress.includes(number)) {
+            fullAddress += ` ${number}`;
+          }
+          if (district) {
+            fullAddress += `, ${district}`;
+          }
+          
+          if (!fullAddress.trim()) {
+            fullAddress = searchQuery.trim();
+          }
+
+          let resolvedZone = resolveZoneFromCoordinates(simCoords.x, simCoords.y, mapWidth, mapHeight);
+
+          setFormData(prev => ({
+            ...prev,
+            address: fullAddress,
+            zone: resolvedZone,
+          }));
+        }
+      } else {
+        Alert.alert('Sin resultados', 'No se encontró la dirección especificada.');
+      }
+    } catch (error) {
+      console.error('Error en geocodificación:', error);
+      Alert.alert('Error', 'No se pudo buscar la dirección.');
+    } finally {
+      setIsLocating(false);
+      setSuggestions([]);
+    }
+  };
+
   const handleGetCurrentLocation = async () => {
     setIsLocating(true);
     try {
@@ -659,17 +732,24 @@ export default function DeliveryAddressesScreen() {
           <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Buscar dirección</Text>
           <View style={styles.searchContainer}>
             <TextInput
-              style={[styles.input, { flex: 1 }]}
+              style={[styles.input, { flex: 1, paddingRight: 70 }]}
               value={searchQuery}
               onChangeText={handleSearchChange}
+              onSubmitEditing={handleRealSearch}
               placeholder="Escribe tu dirección (ej: Larco, Miraflores)"
               placeholderTextColor={colors.textLight}
+              returnKeyType="search"
             />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => handleSearchChange('')} style={styles.clearSearchBtn}>
-                <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+            <View style={styles.searchActions}>
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => handleSearchChange('')} style={styles.searchActionBtn}>
+                  <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={handleRealSearch} style={styles.searchActionBtn}>
+                <Ionicons name="search" size={20} color={colors.primary} />
               </TouchableOpacity>
-            )}
+            </View>
           </View>
 
           {/* Autocomplete suggestions list */}
@@ -1003,6 +1083,16 @@ const getStyles = (colors: any) => StyleSheet.create({
   clearSearchBtn: {
     position: 'absolute',
     right: Spacing.md,
+    padding: Spacing.xs,
+  },
+  searchActions: {
+    position: 'absolute',
+    right: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  searchActionBtn: {
     padding: Spacing.xs,
   },
   suggestionsContainer: {
