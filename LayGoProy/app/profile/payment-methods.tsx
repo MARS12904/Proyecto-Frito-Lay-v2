@@ -536,6 +536,7 @@ export default function PaymentMethodsScreen() {
             value={formData.name}
             onChangeText={(text) => setFormData({ ...formData, name: text })}
             placeholder="Ej: Tarjeta principal"
+            placeholderTextColor={colors.textLight}
           />
         </View>
 
@@ -572,11 +573,11 @@ export default function PaymentMethodsScreen() {
           <>
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Celular *</Text>
-              <TextInput style={styles.input} value={formData.walletPhone} onChangeText={(t) => setFormData({ ...formData, walletPhone: t })} placeholder="9XXXXXXXX" keyboardType="phone-pad" maxLength={9} />
+              <TextInput style={styles.input} value={formData.walletPhone} onChangeText={(t) => setFormData({ ...formData, walletPhone: t })} placeholder="9XXXXXXXX" placeholderTextColor={colors.textLight} keyboardType="phone-pad" maxLength={9} />
             </View>
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Titular</Text>
-              <TextInput style={styles.input} value={formData.holderName} onChangeText={(t) => setFormData({ ...formData, holderName: t })} placeholder="Nombre en la billetera" />
+              <TextInput style={styles.input} value={formData.holderName} onChangeText={(t) => setFormData({ ...formData, holderName: t })} placeholder="Nombre en la billetera" placeholderTextColor={colors.textLight} />
             </View>
           </>
         )}
@@ -585,17 +586,17 @@ export default function PaymentMethodsScreen() {
           <>
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Banco *</Text>
-              <TextInput style={styles.input} value={formData.bank} onChangeText={(t) => setFormData({ ...formData, bank: t })} placeholder="Ej: BCP" />
+              <TextInput style={styles.input} value={formData.bank} onChangeText={(t) => setFormData({ ...formData, bank: t })} placeholder="Ej: BCP" placeholderTextColor={colors.textLight} />
             </View>
             {formData.type === 'transfer' && (
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>CCI * (20 dígitos)</Text>
-                <TextInput style={styles.input} value={formData.cci} onChangeText={(t) => setFormData({ ...formData, cci: t })} placeholder="011XXXXXXXXXXXXXXX" keyboardType="numeric" maxLength={20} />
+                <TextInput style={styles.input} value={formData.cci} onChangeText={(t) => setFormData({ ...formData, cci: t })} placeholder="011XXXXXXXXXXXXXXX" placeholderTextColor={colors.textLight} keyboardType="numeric" maxLength={20} />
               </View>
             )}
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Titular *</Text>
-              <TextInput style={styles.input} value={formData.holderName} onChangeText={(t) => setFormData({ ...formData, holderName: t })} placeholder="Nombre del titular" />
+              <TextInput style={styles.input} value={formData.holderName} onChangeText={(t) => setFormData({ ...formData, holderName: t })} placeholder="Nombre del titular" placeholderTextColor={colors.textLight} />
             </View>
             <View style={styles.inputGroup}>
               <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Tipo de Documento *</Text>
@@ -620,6 +621,7 @@ export default function PaymentMethodsScreen() {
                 value={formData.documentNumber}
                 onChangeText={(t) => setFormData({ ...formData, documentNumber: t.replace(/\D/g, '') })}
                 placeholder={formData.documentType === 'ruc' ? "Ingresa RUC de 11 dígitos" : "Ingresa DNI de 8 dígitos"}
+                placeholderTextColor={colors.textLight}
                 keyboardType="numeric"
                 maxLength={formData.documentType === 'ruc' ? 11 : 8}
               />

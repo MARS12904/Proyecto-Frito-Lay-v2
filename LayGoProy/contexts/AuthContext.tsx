@@ -522,6 +522,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             options: {
               data: {
                 name: userData.name,
+                phone: userData.phone,
               },
             },
           });
@@ -596,6 +597,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (!profile) {
               profile = await ensureProfile();
+            } else if (userData.phone) {
+              // Si el perfil ya existe (ej: creado por el trigger handle_new_user), actualizamos el teléfono
+              const { data: updatedProfile, error: updateError } = await supabase
+                .from('user_profiles')
+                .update({ phone: userData.phone.trim() })
+                .eq('id', authData.user.id)
+                .select()
+                .single();
+              if (!updateError && updatedProfile) {
+                profile = updatedProfile;
+              } else {
+                console.warn('Error updating phone on existing profile:', updateError);
+              }
             }
 
             if (!profile) {

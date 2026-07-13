@@ -11,8 +11,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing } from '../../constants/theme';
+import { Spacing } from '../../constants/theme';
 import { useResponsive } from '../../hooks/useResponsive';
+import { useAppColors } from '../../contexts/ThemeContext';
 
 type FormSheetModalProps = {
   visible: boolean;
@@ -25,6 +26,8 @@ type FormSheetModalProps = {
 export function FormSheetModal({ visible, title, onClose, children }: FormSheetModalProps) {
   const insets = useSafeAreaInsets();
   const { scaleFont, horizontalPadding, isCompact } = useResponsive();
+  const colors = useAppColors();
+  const styles = getStyles(colors);
 
   return (
     <Modal
@@ -47,7 +50,7 @@ export function FormSheetModal({ visible, title, onClose, children }: FormSheetM
           ]}
         >
           <TouchableOpacity onPress={onClose} style={styles.closeBtn} accessibilityLabel="Cerrar">
-            <Ionicons name="close" size={26} color={Colors.light.text} />
+            <Ionicons name="close" size={26} color={colors.text} />
           </TouchableOpacity>
           <Text
             style={[styles.title, { fontSize: scaleFont(isCompact ? 17 : 18) }]}
@@ -74,19 +77,19 @@ export function FormSheetModal({ visible, title, onClose, children }: FormSheetM
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingBottom: 12,
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: colors.border,
   },
   closeBtn: {
     width: 44,
@@ -97,11 +100,12 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     fontWeight: '700',
-    color: Colors.light.text,
+    color: colors.text,
     textAlign: 'center',
     marginHorizontal: 4,
   },
   scroll: {
     flex: 1,
+    backgroundColor: colors.backgroundSecondary,
   },
 });

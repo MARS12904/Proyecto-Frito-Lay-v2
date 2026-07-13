@@ -208,7 +208,7 @@ function CatalogContent() {
     const productStock = getProductStockValue(item);
 
     return (
-      <ResponsiveCard style={styles.productCard} padding="md">
+      <ResponsiveCard style={styles.productCard} padding="md" backgroundColor={colors.backgroundCard}>
         <View style={styles.productImageContainer}>
           <ProductImage 
             source={{ uri: item.image }} 

@@ -8,7 +8,25 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  Switch,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
+import * as Location from 'expo-location';
+
+let MapView: any = null;
+let Marker: any = null;
+
+if (Platform.OS !== 'web') {
+  try {
+    const Maps = require('react-native-maps');
+    MapView = Maps.default;
+    Marker = Maps.Marker;
+  } catch (e) {
+    console.error('Error loading react-native-maps:', e);
+  }
+}
+
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, FontSizes, BorderRadius, Shadows } from '../constants/theme';
@@ -75,6 +93,49 @@ const deliveryAreas = [
   { id: 'provincias', name: 'Provincias', fee: 15 },
 ];
 
+interface LimaLocation {
+  address: string;
+  district: string;
+  zone: 'lima-centro' | 'lima-norte' | 'lima-sur' | 'lima-este' | 'callao';
+  x: number;
+  y: number;
+}
+
+const LIMA_LOCATIONS: LimaLocation[] = [
+  { address: 'Av. Arequipa 1230', district: 'Miraflores', zone: 'lima-centro', x: 100, y: 100 },
+  { address: 'Av. Larco 456', district: 'Miraflores', zone: 'lima-centro', x: 100, y: 110 },
+  { address: 'Calle Las Begonias 350', district: 'San Isidro', zone: 'lima-centro', x: 110, y: 90 },
+  { address: 'Jr. Carabaya 500', district: 'Cercado de Lima', zone: 'lima-centro', x: 95, y: 75 },
+  { address: 'Av. Brasil 2200', district: 'Jesús María', zone: 'lima-centro', x: 80, y: 90 },
+  { address: 'Av. Las Palmeras 3800', district: 'Los Olivos', zone: 'lima-norte', x: 100, y: 35 },
+  { address: 'Av. Antúnez de Mayolo 1200', district: 'Los Olivos', zone: 'lima-norte', x: 90, y: 40 },
+  { address: 'Av. Alfredo Mendiola 1400', district: 'San Martín de Porres', zone: 'lima-norte', x: 85, y: 55 },
+  { address: 'Av. Túpac Amaru 2500', district: 'Comas', zone: 'lima-norte', x: 110, y: 25 },
+  { address: 'Av. Defensores del Morro 650', district: 'Chorrillos', zone: 'lima-sur', x: 100, y: 165 },
+  { address: 'Av. Pedro Miotta 820', district: 'San Juan de Miraflores', zone: 'lima-sur', x: 115, y: 155 },
+  { address: 'Av. Separadora Industrial 2400', district: 'Ate', zone: 'lima-este', x: 170, y: 85 },
+  { address: 'Av. Javier Prado Este 4800', district: 'La Molina', zone: 'lima-este', x: 160, y: 95 },
+  { address: 'Av. Gran Chimú 450', district: 'San Juan de Lurigancho', zone: 'lima-este', x: 130, y: 60 },
+  { address: 'Av. Sáenz Peña 250', district: 'Callao', zone: 'callao', x: 30, y: 80 },
+  { address: 'Av. La Marina 3200', district: 'La Perla', zone: 'callao', x: 45, y: 95 },
+  { address: 'Calle Grau 120', district: 'La Punta', zone: 'callao', x: 15, y: 85 },
+];
+
+const resolveZoneFromCoordinates = (x: number, y: number, width: number, height: number) => {
+  const relX = x / width;
+  const relY = y / height;
+  
+  if (relX < 0.35 && relY < 0.6) return 'callao';
+  if (relX >= 0.35 && relY < 0.45) return 'lima-norte';
+  if (relX >= 0.6 && relY < 0.65) return 'lima-este';
+  if (relY >= 0.65) return 'lima-sur';
+  return 'lima-centro';
+};
+
+const getZoneDisplayName = (zoneId: string) => {
+  return deliveryAreas.find(area => area.id === zoneId)?.name || zoneId;
+};
+
 export default function DeliveryScheduler({
   visible,
   onClose,
@@ -112,6 +173,17 @@ export default function DeliveryScheduler({
     notes: '',
   });
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
+  const [saveThisAddress, setSaveThisAddress] = useState(true);
+
+  // Search and Map simulated states (same as delivery-addresses.tsx)
+  const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<LimaLocation[]>([]);
+  const [markerPos, setMarkerPos] = useState({ x: 125, y: 100 });
+  const mapWidth = 250;
+  const mapHeight = 200;
+  const [markerCoords, setMarkerCoords] = useState({ latitude: -12.046374, longitude: -77.042793 });
+  const [isLocating, setIsLocating] = useState(false);
+  const [showZoneAccordion, setShowZoneAccordion] = useState(false);
 
   const getMinDate = () => {
     const tomorrow = new Date();
@@ -158,11 +230,180 @@ export default function DeliveryScheduler({
     }
   };
 
-  // Determinar el número máximo de pasos según si hay direcciones guardadas
-  // Usar useMemo para recalcular cuando cambien las direcciones
-  const maxSteps = React.useMemo(() => {
-    return savedAddresses.length > 0 ? 4 : 5;
-  }, [savedAddresses.length]);
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    if (text.trim().length > 1) {
+      const filtered = LIMA_LOCATIONS.filter(loc => 
+        loc.address.toLowerCase().includes(text.toLowerCase()) ||
+        loc.district.toLowerCase().includes(text.toLowerCase())
+      );
+      setSuggestions(filtered);
+    } else {
+      setSuggestions([]);
+    }
+  };
+
+  const handleSelectSuggestion = (loc: LimaLocation) => {
+    const fullAddress = `${loc.address}, ${loc.district}`;
+    setNewAddressForm(prev => ({
+      ...prev,
+      address: fullAddress,
+      zone: loc.zone,
+    }));
+    setMarkerPos({ x: loc.x, y: loc.y });
+    
+    let gpsCoords = { latitude: -12.115, longitude: -77.03 }; // Miraflores
+    if (loc.zone === 'lima-norte') gpsCoords = { latitude: -11.97, longitude: -77.07 };
+    else if (loc.zone === 'lima-sur') gpsCoords = { latitude: -12.18, longitude: -77.01 };
+    else if (loc.zone === 'lima-este') gpsCoords = { latitude: -12.05, longitude: -76.92 };
+    else if (loc.zone === 'callao') gpsCoords = { latitude: -12.06, longitude: -77.14 };
+    setMarkerCoords(gpsCoords);
+
+    setSearchQuery(fullAddress);
+    setSuggestions([]);
+  };
+
+  const handleGetCurrentLocation = async () => {
+    setIsLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permiso denegado',
+          'Se requiere permiso de ubicación para autocompletar tu dirección.'
+        );
+        setIsLocating(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const { latitude, longitude } = location.coords;
+      console.log('Ubicación GPS obtenida:', latitude, longitude);
+
+      const geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+      console.log('Geocodificación inversa:', geocode);
+
+      if (geocode && geocode.length > 0) {
+        const place = geocode[0];
+        const street = place.street || '';
+        const number = place.name || place.subregion || '';
+        const district = place.district || place.city || '';
+        
+        let fullAddress = street;
+        if (number && !fullAddress.includes(number)) {
+          fullAddress += ` ${number}`;
+        }
+        if (district) {
+          fullAddress += `, ${district}`;
+        }
+        
+        if (!fullAddress.trim()) {
+          fullAddress = `Ubicación GPS (${latitude.toFixed(6)}, ${longitude.toFixed(6)})`;
+        }
+
+        let resolvedZone: 'lima-centro' | 'lima-norte' | 'lima-sur' | 'lima-este' | 'callao' = 'lima-centro';
+        const distLower = district.toLowerCase();
+        if (distLower.includes('olivos') || distLower.includes('comas') || distLower.includes('carabayllo') || distLower.includes('puente piedra') || distLower.includes('independencia') || distLower.includes('martin de porres')) {
+          resolvedZone = 'lima-norte';
+        } else if (distLower.includes('chorrillos') || distLower.includes('miraflores') || distLower.includes('surco') || distLower.includes('barranco') || distLower.includes('san juan de miraflores') || distLower.includes('villa el salvador') || distLower.includes('villa maria')) {
+          resolvedZone = distLower.includes('miraflores') || distLower.includes('surco') || distLower.includes('barranco') ? 'lima-centro' : 'lima-sur';
+        } else if (distLower.includes('ate') || distLower.includes('la molina') || distLower.includes('san juan de lurigancho') || distLower.includes('santa anita') || distLower.includes('el agustino') || distLower.includes('cienegilla') || distLower.includes('chaclacayo')) {
+          resolvedZone = 'lima-este';
+        } else if (distLower.includes('callao') || distLower.includes('bellavista') || distLower.includes('carmen de la legua') || distLower.includes('perla') || distLower.includes('punta')) {
+          resolvedZone = 'callao';
+        }
+
+        setNewAddressForm(prev => ({
+          ...prev,
+          address: fullAddress,
+          zone: resolvedZone,
+        }));
+        setSearchQuery(fullAddress);
+        setMarkerCoords({ latitude, longitude });
+      } else {
+        Alert.alert('Error', 'No se pudo determinar la dirección para tu ubicación actual.');
+      }
+    } catch (error) {
+      console.error('Error al obtener ubicación:', error);
+      Alert.alert('Error', 'Hubo un problema al obtener la ubicación actual.');
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  const handleMapPress = async (evt: any) => {
+    const { latitude, longitude } = evt.nativeEvent.coordinate;
+    setMarkerCoords({ latitude, longitude });
+    
+    try {
+      const geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (geocode && geocode.length > 0) {
+        const place = geocode[0];
+        const street = place.street || '';
+        const number = place.name || '';
+        const district = place.district || place.city || '';
+        
+        let fullAddress = street;
+        if (number && !fullAddress.includes(number)) {
+          fullAddress += ` ${number}`;
+        }
+        if (district) {
+          fullAddress += `, ${district}`;
+        }
+        
+        if (!fullAddress.trim()) {
+          fullAddress = `Ubicación GPS (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
+        }
+
+        let resolvedZone: 'lima-centro' | 'lima-norte' | 'lima-sur' | 'lima-este' | 'callao' = 'lima-centro';
+        const distLower = district.toLowerCase();
+        if (distLower.includes('olivos') || distLower.includes('comas') || distLower.includes('carabayllo') || distLower.includes('puente piedra') || distLower.includes('independencia') || distLower.includes('martin de porres')) {
+          resolvedZone = 'lima-norte';
+        } else if (distLower.includes('chorrillos') || distLower.includes('miraflores') || distLower.includes('surco') || distLower.includes('barranco') || distLower.includes('san juan de miraflores') || distLower.includes('villa el salvador') || distLower.includes('villa maria')) {
+          resolvedZone = distLower.includes('miraflores') || distLower.includes('surco') || distLower.includes('barranco') ? 'lima-centro' : 'lima-sur';
+        } else if (distLower.includes('ate') || distLower.includes('la molina') || distLower.includes('san juan de lurigancho') || distLower.includes('santa anita') || distLower.includes('el agustino') || distLower.includes('cienegilla') || distLower.includes('chaclacayo')) {
+          resolvedZone = 'lima-este';
+        } else if (distLower.includes('callao') || distLower.includes('bellavista') || distLower.includes('carmen de la legua') || distLower.includes('perla') || distLower.includes('punta')) {
+          resolvedZone = 'callao';
+        }
+
+        setNewAddressForm(prev => ({
+          ...prev,
+          address: fullAddress,
+          zone: resolvedZone,
+        }));
+        setSearchQuery(fullAddress);
+      }
+    } catch (error) {
+      console.error('Error reverse geocoding map press:', error);
+    }
+  };
+
+  const handleSimulatedMapPress = (evt: any) => {
+    const { locationX, locationY } = evt.nativeEvent;
+    setMarkerPos({ x: locationX, y: locationY });
+    const resolvedZone = resolveZoneFromCoordinates(locationX, locationY, mapWidth, mapHeight);
+    
+    let resolvedAddress = '';
+    if (resolvedZone === 'lima-centro') resolvedAddress = 'Av. Arequipa 1230, Miraflores';
+    else if (resolvedZone === 'lima-norte') resolvedAddress = 'Av. Las Palmeras 3800, Los Olivos';
+    else if (resolvedZone === 'lima-sur') resolvedAddress = 'Av. Defensores del Morro 650, Chorrillos';
+    else if (resolvedZone === 'lima-este') resolvedAddress = 'Av. Javier Prado Este 4800, La Molina';
+    else if (resolvedZone === 'callao') resolvedAddress = 'Av. Sáenz Peña 250, Callao';
+    
+    setNewAddressForm(prev => ({
+      ...prev,
+      address: resolvedAddress,
+      zone: resolvedZone,
+    }));
+    setSearchQuery(resolvedAddress);
+  };
+
+  // El número máximo de pasos ahora siempre es 4
+  const maxSteps = 4;
 
   const handleNext = () => {
     if (step === 1 && !selectedDate) {
@@ -174,29 +415,37 @@ export default function DeliveryScheduler({
       return;
     }
     
-    // Si hay direcciones guardadas, el paso 3 es selección de dirección
+    // Validar paso 3 según si hay direcciones guardadas
     if (savedAddresses.length > 0) {
       if (step === 3 && !selectedAddressId && !showAddAddress) {
         Alert.alert('Error', 'Por favor selecciona una dirección o añade una nueva');
         return;
       }
-      if (step === 3 && showAddAddress && !newAddressForm.address.trim()) {
-        Alert.alert('Error', 'Por favor ingresa la dirección de entrega');
+      if (step === 3 && showAddAddress) {
+        Alert.alert('Dirección no guardada', 'Guarda la dirección primero o cancela.');
         return;
       }
     } else {
-      // Flujo sin direcciones guardadas
-      if (step === 3 && !selectedArea) {
-        Alert.alert('Error', 'Por favor selecciona una zona de entrega');
-        return;
-      }
-      if (step === 4 && !address.trim()) {
-        Alert.alert('Error', 'Por favor ingresa la dirección de entrega');
-        return;
+      // Sin direcciones guardadas, el paso 3 es el formulario de Nueva Dirección
+      if (step === 3) {
+        if (!newAddressForm.address.trim()) {
+          Alert.alert('Error', 'Por favor ingresa la dirección completa');
+          return;
+        }
+        if (!newAddressForm.zone) {
+          Alert.alert('Error', 'Por favor selecciona la zona');
+          return;
+        }
+        // Copiar del formulario a los estados principales
+        setAddress(newAddressForm.address.trim());
+        setSelectedArea(newAddressForm.zone);
+        setNotes(newAddressForm.notes.trim());
       }
     }
     
-    setStep(step + 1);
+    if (step < maxSteps) {
+      setStep(step + 1);
+    }
   };
 
   const handlePrevious = () => {
@@ -255,7 +504,7 @@ export default function DeliveryScheduler({
     }
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     const selectedTimeData = timeSlots.find(slot => slot.id === selectedTimeSlot);
     
     if (!selectedTimeData) {
@@ -268,28 +517,68 @@ export default function DeliveryScheduler({
       return;
     }
 
-    const schedule: DeliverySchedule = {
-      id: existingSchedule?.id || Date.now().toString(),
-      date: selectedDate,
-      timeSlot: selectedTimeData.label,
-      address: address.trim(),
-      addressId: selectedAddressId || undefined, // ID de la dirección seleccionada
-      notes: notes.trim() || undefined,
+    const proceedWithSchedule = (addressId?: string) => {
+      const schedule: DeliverySchedule = {
+        id: existingSchedule?.id || Date.now().toString(),
+        date: selectedDate,
+        timeSlot: selectedTimeData.label,
+        address: address.trim(),
+        addressId: addressId,
+        notes: notes.trim() || undefined,
+      };
+
+      onSchedule(schedule);
+      onClose();
+      
+      // Reset form
+      setStep(1);
+      setSelectedDate(new Date().toISOString().split('T')[0]);
+      setSelectedTimeSlot('');
+      setSelectedArea('');
+      setAddress('');
+      setNotes('');
+      setSelectedAddressId(null);
+      setShowAddAddress(false);
+      setNewAddressForm({ address: '', zone: '', notes: '' });
+      setSearchQuery('');
+      setSuggestions([]);
     };
 
-    onSchedule(schedule);
-    onClose();
-    
-    // Reset form
-    setStep(1);
-    setSelectedDate(new Date().toISOString().split('T')[0]);
-    setSelectedTimeSlot('');
-    setSelectedArea('');
-    setAddress('');
-    setNotes('');
-    setSelectedAddressId(null);
-    setShowAddAddress(false);
-    setNewAddressForm({ address: '', zone: '', notes: '' });
+    // Si el usuario no tiene direcciones guardadas previamente, preguntar al confirmar
+    if (savedAddresses.length === 0 && user?.id) {
+      Alert.alert(
+        'Guardar dirección',
+        '¿Deseas guardar esta dirección en tu perfil para futuras compras?',
+        [
+          {
+            text: 'No',
+            style: 'cancel',
+            onPress: () => {
+              proceedWithSchedule(undefined);
+            }
+          },
+          {
+            text: 'Sí',
+            onPress: async () => {
+              try {
+                const savedId = await deliveryAddressesService.saveAddress(user.id, {
+                  address: address.trim(),
+                  zone: selectedArea || undefined,
+                  notes: notes.trim() || undefined,
+                  isDefault: true,
+                });
+                proceedWithSchedule(savedId || undefined);
+              } catch (error) {
+                console.error('Error al guardar dirección al confirmar:', error);
+                proceedWithSchedule(undefined);
+              }
+            }
+          }
+        ]
+      );
+    } else {
+      proceedWithSchedule(selectedAddressId || undefined);
+    }
   };
 
   const monthNames = [
@@ -579,165 +868,216 @@ export default function DeliveryScheduler({
       );
     }
 
-    // Flujo alternativo sin direcciones guardadas (Paso 3 es zona de entrega)
+    // Flujo alternativo sin direcciones guardadas (Paso 3 es formulario completo)
     return renderStep3Alternative();
   };
 
   const renderStep3Alternative = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Selecciona la Zona de Entrega</Text>
-      <Text style={styles.stepDescription}>
-        Elige el distrito donde se encuentra tu negocio
-      </Text>
+      {/* Search box */}
+      <View style={styles.inputGroup}>
+        <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Buscar dirección</Text>
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={[styles.input, { flex: 1 }]}
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+            placeholder="Escribe tu dirección (ej: Larco, Miraflores)"
+            placeholderTextColor={colors.textLight}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => handleSearchChange('')} style={styles.clearSearchBtn}>
+              <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Autocomplete suggestions list */}
+        {suggestions.length > 0 && (
+          <ScrollView style={styles.suggestionsContainer} keyboardShouldPersistTaps="handled">
+            {suggestions.map((loc, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={styles.suggestionRow}
+                onPress={() => handleSelectSuggestion(loc)}
+              >
+                <Ionicons name="location-outline" size={16} color={colors.primary} style={{ marginRight: 8 }} />
+                <Text style={styles.suggestionText} numberOfLines={1}>
+                  {loc.address}, {loc.district} ({getZoneDisplayName(loc.zone)})
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+      </View>
+
+      {/* Location permission retrieval */}
+      <TouchableOpacity
+        style={[styles.locationBtn, { borderColor: colors.primary }]}
+        onPress={handleGetCurrentLocation}
+        disabled={isLocating}
+      >
+        {isLocating ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <Ionicons name="navigate" size={18} color={colors.primary} />
+        )}
+        <Text style={styles.locationBtnText}>
+          {isLocating ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Interactive map */}
+      <Text style={[styles.inputLabel, { fontSize: scaleFont(13), marginBottom: 2 }]}>Ubicación exacta en el mapa</Text>
+      <Text style={styles.gpsPrompt}>Arrastra o toca el mapa para ajustar el pin en Lima/Callao</Text>
       
-      <ScrollView style={styles.areasContainer} showsVerticalScrollIndicator={false}>
-        {deliveryAreas.map((area) => (
-          <TouchableOpacity
-            key={area.id}
-            style={[
-              styles.areaButton,
-              selectedArea === area.id && styles.areaButtonActive
-            ]}
-            onPress={() => {
-              setSelectedArea(area.id);
-              // Si la dirección ingresada está vacía, prellenarla
-              if (!address) {
-                setAddress('');
-              }
-            }}
-          >
-            <View style={styles.areaInfo}>
-              <Text style={[
-                styles.areaName,
-                selectedArea === area.id && styles.areaNameActive
-              ]}>
-                {area.name}
-              </Text>
-              <Text style={[
-                styles.areaFee,
-                selectedArea === area.id && styles.areaFeeActive
-              ]}>
-                {area.fee === 0 ? 'Gratis' : `+S/ ${area.fee}`}
-              </Text>
-            </View>
-            {selectedArea === area.id && (
-              <Ionicons name="checkmark-circle" size={20} color={colors.background} />
-            )}
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {Platform.OS !== 'web' && MapView ? (
+        <MapView
+          style={styles.mapContainer}
+          initialRegion={{
+            latitude: markerCoords.latitude,
+            longitude: markerCoords.longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }}
+          region={{
+            latitude: markerCoords.latitude,
+            longitude: markerCoords.longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }}
+          onPress={handleMapPress}
+        >
+          {Marker && (
+            <Marker
+              coordinate={markerCoords}
+              draggable
+              onDragEnd={(e: any) => handleMapPress({ nativeEvent: { coordinate: e.nativeEvent.coordinate } })}
+              title="Tu ubicación de entrega"
+              description={newAddressForm.address}
+            />
+          )}
+        </MapView>
+      ) : (
+        <TouchableOpacity 
+          activeOpacity={0.9} 
+          style={styles.mapContainer} 
+          onPress={handleSimulatedMapPress}
+        >
+          {/* Simulated Map Visuals */}
+          <View style={styles.mapGridLineH1} />
+          <View style={styles.mapGridLineH2} />
+          <View style={styles.mapGridLineV1} />
+          <View style={styles.mapGridLineV2} />
+          
+          <Text style={[styles.mapLabel, { left: 15, top: 40 }]}>CALLAO</Text>
+          <Text style={[styles.mapLabel, { left: 90, top: 20 }]}>LIMA NORTE</Text>
+          <Text style={[styles.mapLabel, { left: 100, top: 90 }]}>LIMA CENTRO</Text>
+          <Text style={[styles.mapLabel, { left: 170, top: 60 }]}>LIMA ESTE</Text>
+          <Text style={[styles.mapLabel, { left: 110, top: 150 }]}>LIMA SUR</Text>
+
+          {/* Simulated Coastline */}
+          <View style={styles.mapCoastline} />
+          
+          {/* Map Pin */}
+          <View style={[styles.mapPin, { left: markerPos.x - 12, top: markerPos.y - 24 }]}>
+            <Ionicons name="location" size={28} color={colors.primary} />
+          </View>
+        </TouchableOpacity>
+      )}
+
+      {/* Accordion Zone Selector */}
+      <View style={[styles.inputGroup, { marginTop: Spacing.md }]}>
+        <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Zona de entrega *</Text>
+        <TouchableOpacity 
+          style={styles.accordionHeader} 
+          onPress={() => setShowZoneAccordion(!showZoneAccordion)}
+        >
+          <Text style={styles.accordionHeaderText}>
+            {newAddressForm.zone ? getZoneDisplayName(newAddressForm.zone) : 'Seleccionar zona de entrega'}
+          </Text>
+          <Ionicons 
+            name={showZoneAccordion ? "chevron-up" : "chevron-down"} 
+            size={18} 
+            color={colors.text} 
+          />
+        </TouchableOpacity>
+        
+        {showZoneAccordion && (
+          <View style={styles.accordionContent}>
+            {deliveryAreas.filter(a => a.id !== 'provincias').map((area) => (
+              <TouchableOpacity
+                key={area.id}
+                style={[
+                  styles.accordionOption,
+                  newAddressForm.zone === area.id && styles.accordionOptionActive
+                ]}
+                onPress={() => {
+                  setNewAddressForm(prev => ({ ...prev, zone: area.id }));
+                  setShowZoneAccordion(false);
+                }}
+              >
+                <View style={styles.accordionOptionRow}>
+                  <Text style={[
+                    styles.accordionOptionText,
+                    newAddressForm.zone === area.id && styles.accordionOptionTextActive
+                  ]}>
+                    {area.name}
+                  </Text>
+                  <Text style={styles.accordionOptionFee}>
+                    {area.fee === 0 ? 'Envío Gratis' : `Costo de envío: S/ ${area.fee.toFixed(2)}`}
+                  </Text>
+                </View>
+                {newAddressForm.zone === area.id && (
+                  <Ionicons name="checkmark" size={18} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* Editable confirmation address */}
+      <View style={styles.inputGroup}>
+        <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Dirección completa (Detalla el número/dpto) *</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={newAddressForm.address}
+          onChangeText={(text) => setNewAddressForm({ ...newAddressForm, address: text })}
+          placeholder="Ej: Av. Arequipa 1230, Dpto 402, Miraflores"
+          placeholderTextColor={colors.textLight}
+          multiline
+          numberOfLines={3}
+        />
+      </View>
+
+      {/* Reference / notes */}
+      <View style={styles.inputGroup}>
+        <Text style={[styles.inputLabel, { fontSize: scaleFont(13) }]}>Notas / Referencia (opcional)</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={newAddressForm.notes}
+          onChangeText={(text) => setNewAddressForm({ ...newAddressForm, notes: text })}
+          placeholder="Instrucciones para el repartidor (ej: timbre malogrado, reja negra)..."
+          placeholderTextColor={colors.textLight}
+          multiline
+          numberOfLines={2}
+        />
+      </View>
     </View>
   );
 
   const renderStep4 = () => {
-    // Si hay direcciones guardadas, el paso 4 es confirmación
-    if (savedAddresses.length > 0) {
-      const selectedTimeData = timeSlots.find(slot => slot.id === selectedTimeSlot);
-      const selectedAddressData = savedAddresses.find(addr => addr.id === selectedAddressId);
-      const selectedAreaData = selectedAddressData?.zone 
-        ? deliveryAreas.find(area => area.id === selectedAddressData.zone)
-        : null;
-      
-      return (
-        <View style={styles.stepContainer}>
-          <Text style={styles.stepTitle}>Confirmar Entrega</Text>
-          <Text style={styles.stepDescription}>
-            Revisa los detalles de tu entrega programada
-          </Text>
-          
-          <View style={styles.confirmationContainer}>
-            <View style={styles.confirmationItem}>
-              <Ionicons name="calendar" size={20} color={colors.primary} />
-              <View style={styles.confirmationText}>
-                <Text style={styles.confirmationLabel}>Fecha:</Text>
-                <Text style={styles.confirmationValue}>
-                  {formatDateForDisplay(selectedDate)}
-                </Text>
-              </View>
-            </View>
-            
-            <View style={styles.confirmationItem}>
-              <Ionicons name="time" size={20} color={colors.primary} />
-              <View style={styles.confirmationText}>
-                <Text style={styles.confirmationLabel}>Horario:</Text>
-                <Text style={styles.confirmationValue}>
-                  {selectedTimeData?.label}
-                </Text>
-              </View>
-            </View>
-            
-            {selectedAreaData && (
-              <View style={styles.confirmationItem}>
-                <Ionicons name="location" size={20} color={colors.primary} />
-                <View style={styles.confirmationText}>
-                  <Text style={styles.confirmationLabel}>Zona:</Text>
-                  <Text style={styles.confirmationValue}>
-                    {selectedAreaData.name} {selectedAreaData.fee === 0 ? '(Gratis)' : `(+S/ ${selectedAreaData.fee})`}
-                  </Text>
-                </View>
-              </View>
-            )}
-            
-            <View style={styles.confirmationItem}>
-              <Ionicons name="home" size={20} color={colors.primary} />
-              <View style={styles.confirmationText}>
-                <Text style={styles.confirmationLabel}>Dirección:</Text>
-                <Text style={styles.confirmationValue}>{address}</Text>
-              </View>
-            </View>
-            
-            {notes && (
-              <View style={styles.confirmationItem}>
-                <Ionicons name="document-text" size={20} color={colors.primary} />
-                <View style={styles.confirmationText}>
-                  <Text style={styles.confirmationLabel}>Notas:</Text>
-                  <Text style={styles.confirmationValue}>{notes}</Text>
-                </View>
-              </View>
-            )}
-          </View>
-        </View>
-      );
-    }
-
-    // Si no hay direcciones, el paso 4 es ingresar la dirección manualmente
-    return (
-      <View style={styles.stepContainer}>
-        <Text style={styles.stepTitle}>Ingresa la Dirección de Entrega</Text>
-        <Text style={styles.stepDescription}>
-          Escribe la dirección exacta para la entrega del pedido
-        </Text>
-        
-        <View style={styles.addressContainer}>
-          <Text style={styles.inputLabel}>Dirección completa *</Text>
-          <TextInput
-            style={styles.addressInput}
-            value={address}
-            onChangeText={setAddress}
-            placeholder="Ej: Av. Arequipa 1230, Miraflores, Lima"
-            placeholderTextColor={colors.textLight}
-            multiline
-            numberOfLines={4}
-          />
-          
-          <Text style={styles.inputLabel}>Notas / Referencia (opcional)</Text>
-          <TextInput
-            style={styles.notesInput}
-            value={notes}
-            onChangeText={setNotes}
-            placeholder="Ej: Segundo piso, portón azul, timbre malogrado"
-            placeholderTextColor={colors.textLight}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
-      </View>
-    );
-  };
-
-  const renderStep5 = () => {
-    const selectedAreaData = deliveryAreas.find(area => area.id === selectedArea);
     const selectedTimeData = timeSlots.find(slot => slot.id === selectedTimeSlot);
+    
+    // Si hay una dirección seleccionada de la lista
+    const selectedAddressData = savedAddresses.find(addr => addr.id === selectedAddressId);
+    
+    // Zona actual (de la dirección seleccionada, o seleccionada en el formulario)
+    const currentZone = selectedAddressData?.zone || selectedArea;
+    const selectedAreaData = currentZone 
+      ? deliveryAreas.find(area => area.id === currentZone)
+      : null;
     
     return (
       <View style={styles.stepContainer}>
@@ -767,15 +1107,17 @@ export default function DeliveryScheduler({
             </View>
           </View>
           
-          <View style={styles.confirmationItem}>
-            <Ionicons name="location" size={20} color={colors.primary} />
-            <View style={styles.confirmationText}>
-              <Text style={styles.confirmationLabel}>Zona:</Text>
-              <Text style={styles.confirmationValue}>
-                {selectedAreaData?.name} {selectedAreaData?.fee === 0 ? '(Gratis)' : `(+S/ ${selectedAreaData?.fee})`}
-              </Text>
+          {selectedAreaData && (
+            <View style={styles.confirmationItem}>
+              <Ionicons name="location" size={20} color={colors.primary} />
+              <View style={styles.confirmationText}>
+                <Text style={styles.confirmationLabel}>Zona:</Text>
+                <Text style={styles.confirmationValue}>
+                  {selectedAreaData.name} {selectedAreaData.fee === 0 ? '(Gratis)' : `(+S/ ${selectedAreaData.fee})`}
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
           
           <View style={styles.confirmationItem}>
             <Ionicons name="home" size={20} color={colors.primary} />
@@ -809,8 +1151,6 @@ export default function DeliveryScheduler({
         return renderStep3();
       case 4:
         return renderStep4();
-      case 5:
-        return renderStep5();
       default:
         return null;
     }
@@ -1367,6 +1707,22 @@ function getStyles(colors: any) {
     calendarDayTextDisabled: {
       color: colors.textLight,
     },
+    saveToggleContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: Spacing.md,
+      paddingTop: Spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    saveToggleLabel: {
+      fontSize: FontSizes.sm,
+      fontWeight: '500',
+      color: colors.text,
+      flex: 1,
+      marginRight: Spacing.md,
+    },
     selectedDateBadge: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1380,6 +1736,197 @@ function getStyles(colors: any) {
       fontWeight: '600',
       color: colors.primary,
       marginLeft: Spacing.xs,
+    },
+    searchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      position: 'relative',
+    },
+    clearSearchBtn: {
+      position: 'absolute',
+      right: Spacing.md,
+      padding: Spacing.xs,
+    },
+    suggestionsContainer: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: BorderRadius.md,
+      marginTop: Spacing.xs,
+      maxHeight: 150,
+    },
+    suggestionRow: {
+      padding: Spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    suggestionText: {
+      fontSize: FontSizes.sm,
+      color: colors.text,
+    },
+    locationBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: Spacing.sm,
+      paddingHorizontal: Spacing.md,
+      borderRadius: BorderRadius.md,
+      borderWidth: 1.5,
+      marginBottom: Spacing.md,
+      gap: Spacing.xs,
+      backgroundColor: colors.background,
+    },
+    locationBtnText: {
+      fontSize: FontSizes.md,
+      fontWeight: 'bold',
+      color: colors.primary,
+    },
+    mapContainer: {
+      width: '100%',
+      height: 250,
+      backgroundColor: colors.backgroundSecondary,
+      borderRadius: BorderRadius.lg,
+      overflow: 'hidden',
+      position: 'relative',
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      alignSelf: 'center',
+      marginVertical: Spacing.sm,
+    },
+    mapGridLineH1: {
+      position: 'absolute',
+      top: 66,
+      left: 0,
+      right: 0,
+      height: 1,
+      backgroundColor: colors.border,
+      opacity: 0.5,
+    },
+    mapGridLineH2: {
+      position: 'absolute',
+      top: 133,
+      left: 0,
+      right: 0,
+      height: 1,
+      backgroundColor: colors.border,
+      opacity: 0.5,
+    },
+    mapGridLineV1: {
+      position: 'absolute',
+      left: 83,
+      top: 0,
+      bottom: 0,
+      width: 1,
+      backgroundColor: colors.border,
+      opacity: 0.5,
+    },
+    mapGridLineV2: {
+      position: 'absolute',
+      left: 166,
+      top: 0,
+      bottom: 0,
+      width: 1,
+      backgroundColor: colors.border,
+      opacity: 0.5,
+    },
+    mapLabel: {
+      position: 'absolute',
+      fontSize: 9,
+      fontWeight: 'bold',
+      color: colors.primary,
+      opacity: 0.4,
+    },
+    mapCoastline: {
+      position: 'absolute',
+      left: -20,
+      bottom: -20,
+      width: 140,
+      height: 140,
+      borderRadius: 70,
+      borderWidth: 2,
+      borderColor: colors.secondary,
+      opacity: 0.15,
+    },
+    mapPin: {
+      position: 'absolute',
+      zIndex: 10,
+    },
+    gpsPrompt: {
+      fontSize: FontSizes.xs,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      fontStyle: 'italic',
+      marginBottom: Spacing.xs,
+    },
+    accordionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: BorderRadius.md,
+      padding: Spacing.md,
+      backgroundColor: colors.background,
+    },
+    accordionHeaderText: {
+      fontSize: FontSizes.md,
+      color: colors.text,
+      fontWeight: '500',
+    },
+    accordionContent: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderTopWidth: 0,
+      borderBottomLeftRadius: BorderRadius.md,
+      borderBottomRightRadius: BorderRadius.md,
+      backgroundColor: colors.backgroundCard,
+      overflow: 'hidden',
+    },
+    accordionOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: Spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    accordionOptionActive: {
+      backgroundColor: colors.primary + '08',
+    },
+    accordionOptionRow: {
+      flex: 1,
+    },
+    accordionOptionText: {
+      fontSize: FontSizes.md,
+      color: colors.text,
+      fontWeight: '500',
+    },
+    accordionOptionTextActive: {
+      color: colors.primary,
+      fontWeight: 'bold',
+    },
+    accordionOptionFee: {
+      fontSize: FontSizes.xs,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    inputGroup: {
+      marginBottom: Spacing.lg,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: BorderRadius.md,
+      padding: Spacing.md,
+      fontSize: FontSizes.md,
+      color: colors.text,
+      backgroundColor: colors.background,
+    },
+    textArea: {
+      minHeight: 80,
+      textAlignVertical: 'top',
     },
   });
 }

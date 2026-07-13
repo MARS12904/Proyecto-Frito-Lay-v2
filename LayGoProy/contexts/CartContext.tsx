@@ -80,11 +80,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadCart();
   }, []);
 
-  // Recargar carrito cuando cambie el usuario
+  // Recargar carrito cuando cambie el usuario (incluye cuando se cierra sesión)
   useEffect(() => {
-    if (user?.id) {
-      loadCart();
-    }
+    loadCart();
   }, [user?.id]);
 
   useEffect(() => {
@@ -95,24 +93,27 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const userId = user?.id;
       
+      // Limpiar estados locales antes de cargar para evitar fugas de sesión previa
+      setItems([]);
+      setDeliveryScheduleState(undefined);
+      setIsWholesaleMode(true);
+      
       // Si el usuario tiene UUID válido (está en Supabase), cargar desde Supabase
       if (userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
         const savedCart = await cartService.getCart(userId);
         if (savedCart) {
           setItems(savedCart.items || []);
           setIsWholesaleMode(savedCart.is_wholesale_mode ?? true);
-          if (savedCart.delivery_schedule) {
-            setDeliveryScheduleState(savedCart.delivery_schedule);
-          }
+          setDeliveryScheduleState(savedCart.delivery_schedule || undefined);
         }
       } else {
         // Fallback a AsyncStorage para usuarios locales
         const currentUserId = await AsyncStorage.getItem('currentUserId');
-        const userId = currentUserId || 'guest';
+        const storageUserId = currentUserId || 'guest';
         
-        const cartData = await AsyncStorage.getItem(`cart_${userId}`);
-        const wholesaleData = await AsyncStorage.getItem(`wholesaleMode_${userId}`);
-        const deliveryData = await AsyncStorage.getItem(`deliverySchedule_${userId}`);
+        const cartData = await AsyncStorage.getItem(`cart_${storageUserId}`);
+        const wholesaleData = await AsyncStorage.getItem(`wholesaleMode_${storageUserId}`);
+        const deliveryData = await AsyncStorage.getItem(`deliverySchedule_${storageUserId}`);
         
         if (cartData) {
           setItems(JSON.parse(cartData));
@@ -144,12 +145,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         // Fallback a AsyncStorage para usuarios locales
         const currentUserId = await AsyncStorage.getItem('currentUserId');
-        const userId = currentUserId || 'guest';
+        const storageUserId = currentUserId || 'guest';
         
-        await AsyncStorage.setItem(`cart_${userId}`, JSON.stringify(items));
-        await AsyncStorage.setItem(`wholesaleMode_${userId}`, JSON.stringify(isWholesaleMode));
+        await AsyncStorage.setItem(`cart_${storageUserId}`, JSON.stringify(items));
+        await AsyncStorage.setItem(`wholesaleMode_${storageUserId}`, JSON.stringify(isWholesaleMode));
         if (deliverySchedule) {
-          await AsyncStorage.setItem(`deliverySchedule_${userId}`, JSON.stringify(deliverySchedule));
+          await AsyncStorage.setItem(`deliverySchedule_${storageUserId}`, JSON.stringify(deliverySchedule));
+        } else {
+          await AsyncStorage.removeItem(`deliverySchedule_${storageUserId}`);
         }
       }
     } catch (error) {

@@ -22,6 +22,7 @@ import { router } from 'expo-router';
 import { paymentMethodsService } from '../../services/paymentMethodsService';
 import { PaymentMethod as SavedPaymentMethod } from '../../data/userStorage';
 import { sendOrderConfirmationEmail } from '../../services/emailService';
+import { useAppColors } from '../../contexts/ThemeContext';
 
 interface PaymentMethod {
   id: string;
@@ -81,6 +82,8 @@ export default function PaymentsScreen() {
 }
 
 function PaymentsContent() {
+  const colors = useAppColors();
+  const styles = getStyles(colors);
   const { 
     items, 
     totalPrice, 
@@ -151,6 +154,25 @@ function PaymentsContent() {
     setSelectedMethod('');
     setCardDetails({ number: '', expiry: '', cvv: '', name: '' });
     setBankDetails({ bank: '', account: '', reference: '' });
+  };
+
+  const handleCardNumberChange = (text: string) => {
+    const cleanText = text.replace(/\D/g, '');
+    let formattedText = '';
+    for (let i = 0; i < cleanText.length; i += 4) {
+      if (i > 0) formattedText += ' ';
+      formattedText += cleanText.slice(i, i + 4);
+    }
+    setCardDetails(prev => ({ ...prev, number: formattedText }));
+  };
+
+  const handleExpiryChange = (text: string) => {
+    const cleanText = text.replace(/\D/g, '');
+    let formattedText = cleanText;
+    if (cleanText.length > 2) {
+      formattedText = `${cleanText.slice(0, 2)}/${cleanText.slice(2, 4)}`;
+    }
+    setCardDetails(prev => ({ ...prev, expiry: formattedText }));
   };
 
   // Cargar métodos de pago guardados
@@ -442,7 +464,7 @@ function PaymentsContent() {
           <Ionicons 
             name={method.icon} 
             size={24} 
-            color={selectedMethod === method.id ? Colors.light.primary : Colors.light.textSecondary} 
+            color={selectedMethod === method.id ? colors.primary : colors.textSecondary} 
           />
           <View style={styles.paymentMethodInfo}>
             <Text style={[
@@ -560,15 +582,15 @@ function PaymentsContent() {
           <Text style={styles.sectionTitle}>Información de Entrega</Text>
           <View style={styles.deliveryDetails}>
             <View style={styles.deliveryItem}>
-              <Ionicons name="calendar" size={16} color={Colors.light.primary} />
+              <Ionicons name="calendar" size={16} color={colors.primary} />
               <Text style={styles.deliveryText}>{deliverySchedule.date}</Text>
             </View>
             <View style={styles.deliveryItem}>
-              <Ionicons name="time" size={16} color={Colors.light.primary} />
+              <Ionicons name="time" size={16} color={colors.primary} />
               <Text style={styles.deliveryText}>{deliverySchedule.timeSlot}</Text>
             </View>
             <View style={styles.deliveryItem}>
-              <Ionicons name="location" size={16} color={Colors.light.primary} />
+              <Ionicons name="location" size={16} color={colors.primary} />
               <Text style={styles.deliveryText}>{deliverySchedule.address}</Text>
             </View>
           </View>
@@ -597,7 +619,7 @@ function PaymentsContent() {
                     'cash-outline'
                   } 
                   size={24} 
-                  color={selectedSavedMethod === method.id ? Colors.light.primary : Colors.light.textSecondary} 
+                  color={selectedSavedMethod === method.id ? colors.primary : colors.textSecondary} 
                 />
                 <View style={styles.savedMethodInfo}>
                   <Text style={[
@@ -644,7 +666,7 @@ function PaymentsContent() {
             style={styles.useDifferentButton}
             onPress={handleUseDifferentMethod}
           >
-            <Ionicons name="add-circle-outline" size={20} color={Colors.light.primary} />
+            <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
             <Text style={styles.useDifferentButtonText}>Usar un método de pago diferente</Text>
           </TouchableOpacity>
         </View>
@@ -679,7 +701,7 @@ function PaymentsContent() {
                 </Text>
               </View>
               <View style={styles.cvvNoticeBox}>
-                <Ionicons name="lock-closed" size={16} color={Colors.light.warning} />
+                <Ionicons name="lock-closed" size={16} color={colors.warning} />
                 <Text style={styles.cvvNoticeText}>
                   Por seguridad, el CVV no se guarda. Debes ingresarlo en cada compra.
                 </Text>
@@ -692,8 +714,9 @@ function PaymentsContent() {
             <TextInput
               style={styles.input}
               placeholder="1234 5678 9012 3456"
+              placeholderTextColor={colors.textLight}
               value={cardDetails.number}
-              onChangeText={(text) => setCardDetails(prev => ({ ...prev, number: text }))}
+              onChangeText={handleCardNumberChange}
               keyboardType="numeric"
               maxLength={19}
               editable={!selectedSavedMethod || useDifferentMethod}
@@ -706,8 +729,9 @@ function PaymentsContent() {
               <TextInput
                 style={styles.input}
                 placeholder="MM/AA"
+                placeholderTextColor={colors.textLight}
                 value={cardDetails.expiry}
-                onChangeText={(text) => setCardDetails(prev => ({ ...prev, expiry: text }))}
+                onChangeText={handleExpiryChange}
                 keyboardType="numeric"
                 maxLength={5}
                 editable={!selectedSavedMethod || useDifferentMethod}
@@ -720,6 +744,7 @@ function PaymentsContent() {
               <TextInput
                 style={styles.input}
                 placeholder="123"
+                placeholderTextColor={colors.textLight}
                 value={cardDetails.cvv}
                 onChangeText={(text) => setCardDetails(prev => ({ ...prev, cvv: text }))}
                 keyboardType="numeric"
@@ -739,6 +764,7 @@ function PaymentsContent() {
               <TextInput
                 style={styles.input}
                 placeholder="Juan Pérez"
+                placeholderTextColor={colors.textLight}
                 value={cardDetails.name}
                 onChangeText={(text) => setCardDetails(prev => ({ ...prev, name: text }))}
                 autoCapitalize="words"
@@ -775,6 +801,7 @@ function PaymentsContent() {
                 <TextInput
                   style={styles.input}
                   placeholder="Ej: Interbank, Scotiabank, etc."
+                  placeholderTextColor={colors.textLight}
                   value={bankDetails.bank}
                   onChangeText={(text) => setBankDetails(prev => ({ ...prev, bank: text }))}
                 />
@@ -785,6 +812,7 @@ function PaymentsContent() {
                 <TextInput
                   style={styles.input}
                   placeholder="Número de tu cuenta"
+                  placeholderTextColor={colors.textLight}
                   value={bankDetails.account}
                   onChangeText={(text) => setBankDetails(prev => ({ ...prev, account: text }))}
                   keyboardType="numeric"
@@ -798,6 +826,7 @@ function PaymentsContent() {
             <TextInput
               style={styles.input}
               placeholder="Número de transferencia"
+              placeholderTextColor={colors.textLight}
               value={bankDetails.reference}
               onChangeText={(text) => setBankDetails(prev => ({ ...prev, reference: text }))}
               keyboardType="numeric"
@@ -807,7 +836,7 @@ function PaymentsContent() {
       )}
 
       <View style={styles.securityInfo}>
-        <Ionicons name="shield-checkmark" size={20} color={Colors.light.success} />
+        <Ionicons name="shield-checkmark" size={20} color={colors.success} />
         <Text style={styles.securityText}>
           Tu información está protegida con encriptación SSL de 256 bits
         </Text>
@@ -831,19 +860,19 @@ function PaymentsContent() {
             return `Pagar S/ ${total.toFixed(2)}`;
           })()}
         </Text>
-        <Ionicons name="arrow-forward" size={20} color={Colors.light.background} />
+        <Ionicons name="arrow-forward" size={20} color={colors.background} />
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
   },
   header: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     padding: Spacing.lg,
     paddingTop: Spacing.xxl,
     ...Shadows.sm,
@@ -851,15 +880,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: FontSizes.xxxl,
     fontWeight: 'bold',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.xs,
   },
   subtitle: {
     fontSize: FontSizes.md,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   orderSummary: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     margin: Spacing.lg,
     padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
@@ -868,7 +897,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: FontSizes.xl,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.md,
   },
   orderItem: {
@@ -883,24 +912,24 @@ const styles = StyleSheet.create({
   },
   itemName: {
     fontSize: FontSizes.md,
-    color: Colors.light.text,
+    color: colors.text,
     fontWeight: '500',
   },
   itemBrand: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   itemDetails: {
     alignItems: 'flex-end',
   },
   itemQuantity: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginBottom: Spacing.xs,
   },
   itemPrice: {
     fontSize: FontSizes.md,
-    color: Colors.light.text,
+    color: colors.text,
     fontWeight: '600',
   },
   summaryRow: {
@@ -911,34 +940,34 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   summaryValue: {
     fontSize: FontSizes.sm,
-    color: Colors.light.text,
+    color: colors.text,
     fontWeight: '500',
   },
   savingsValue: {
-    color: Colors.light.success,
+    color: colors.success,
   },
   totalRow: {
     marginTop: Spacing.sm,
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: colors.border,
   },
   totalLabel: {
     fontSize: FontSizes.lg,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
   },
   totalPrice: {
     fontSize: FontSizes.xl,
     fontWeight: 'bold',
-    color: Colors.light.success,
+    color: colors.success,
   },
   deliveryInfo: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
     padding: Spacing.lg,
@@ -955,10 +984,10 @@ const styles = StyleSheet.create({
   },
   deliveryText: {
     fontSize: FontSizes.sm,
-    color: Colors.light.text,
+    color: colors.text,
   },
   paymentMethods: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
     padding: Spacing.lg,
@@ -967,14 +996,14 @@ const styles = StyleSheet.create({
   },
   paymentMethodCard: {
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
   },
   paymentMethodCardSelected: {
-    borderColor: Colors.light.primary,
-    backgroundColor: Colors.light.backgroundSecondary,
+    borderColor: colors.primary,
+    backgroundColor: colors.backgroundSecondary,
   },
   paymentMethodCardDisabled: {
     opacity: 0.5,
@@ -990,25 +1019,25 @@ const styles = StyleSheet.create({
   paymentMethodName: {
     fontSize: FontSizes.md,
     fontWeight: '500',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.xs,
   },
   paymentMethodNameSelected: {
-    color: Colors.light.primary,
+    color: colors.primary,
   },
   paymentMethodNameDisabled: {
-    color: Colors.light.textLight,
+    color: colors.textLight,
   },
   paymentMethodDescription: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   paymentMethodDescriptionDisabled: {
-    color: Colors.light.textLight,
+    color: colors.textLight,
   },
   processingFee: {
     fontSize: FontSizes.xs,
-    color: Colors.light.warning,
+    color: colors.warning,
     marginTop: Spacing.xs,
   },
   radioButton: {
@@ -1016,24 +1045,24 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: BorderRadius.full,
     borderWidth: 2,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
   radioButtonSelected: {
-    borderColor: Colors.light.primary,
+    borderColor: colors.primary,
   },
   radioButtonDisabled: {
-    borderColor: Colors.light.textLight,
+    borderColor: colors.textLight,
   },
   radioButtonInner: {
     width: 10,
     height: 10,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
   },
   cardDetails: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
     padding: Spacing.lg,
@@ -1041,7 +1070,7 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   transferDetails: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
     padding: Spacing.lg,
@@ -1049,7 +1078,7 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   bankInfo: {
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     marginBottom: Spacing.lg,
@@ -1057,12 +1086,12 @@ const styles = StyleSheet.create({
   bankInfoTitle: {
     fontSize: FontSizes.md,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.sm,
   },
   bankInfoText: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginBottom: Spacing.xs,
   },
   inputGroup: {
@@ -1071,17 +1100,17 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: FontSizes.sm,
     fontWeight: '500',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.sm,
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     fontSize: FontSizes.md,
-    color: Colors.light.text,
-    backgroundColor: Colors.light.background,
+    color: colors.text,
+    backgroundColor: colors.background,
   },
   row: {
     flexDirection: 'row',
@@ -1089,17 +1118,17 @@ const styles = StyleSheet.create({
   securityInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     borderLeftWidth: 4,
-    borderLeftColor: Colors.light.success,
+    borderLeftColor: colors.success,
   },
   securityText: {
     fontSize: FontSizes.sm,
-    color: Colors.light.text,
+    color: colors.text,
     marginLeft: Spacing.sm,
     flex: 1,
   },
@@ -1107,7 +1136,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.xl,
     padding: Spacing.lg,
@@ -1115,16 +1144,16 @@ const styles = StyleSheet.create({
     ...Shadows.md,
   },
   payButtonDisabled: {
-    backgroundColor: Colors.light.border,
+    backgroundColor: colors.border,
   },
   payButtonText: {
-    color: Colors.light.background,
+    color: colors.background,
     fontSize: FontSizes.lg,
     fontWeight: '600',
     marginRight: Spacing.sm,
   },
   savedPaymentMethods: {
-    backgroundColor: Colors.light.backgroundCard,
+    backgroundColor: colors.backgroundCard,
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
     padding: Spacing.lg,
@@ -1133,14 +1162,14 @@ const styles = StyleSheet.create({
   },
   savedMethodCard: {
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
   },
   savedMethodCardSelected: {
-    borderColor: Colors.light.primary,
-    backgroundColor: Colors.light.backgroundSecondary,
+    borderColor: colors.primary,
+    backgroundColor: colors.backgroundSecondary,
   },
   savedMethodHeader: {
     flexDirection: 'row',
@@ -1153,23 +1182,23 @@ const styles = StyleSheet.create({
   savedMethodName: {
     fontSize: FontSizes.md,
     fontWeight: '500',
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.xs,
   },
   savedMethodNameSelected: {
-    color: Colors.light.primary,
+    color: colors.primary,
   },
   savedMethodType: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginBottom: Spacing.xs,
   },
   savedMethodDetails: {
     fontSize: FontSizes.sm,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   defaultBadge: {
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: BorderRadius.sm,
@@ -1178,60 +1207,60 @@ const styles = StyleSheet.create({
   },
   defaultBadgeText: {
     fontSize: FontSizes.xs,
-    color: Colors.light.background,
+    color: colors.background,
     fontWeight: '600',
   },
   useDifferentButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: Colors.light.primary,
+    borderColor: colors.primary,
     borderStyle: 'dashed',
     marginTop: Spacing.sm,
   },
   useDifferentButtonText: {
     fontSize: FontSizes.md,
-    color: Colors.light.primary,
+    color: colors.primary,
     fontWeight: '600',
     marginLeft: Spacing.sm,
   },
   savedMethodInfoBox: {
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     marginBottom: Spacing.md,
     borderLeftWidth: 4,
-    borderLeftColor: Colors.light.primary,
+    borderLeftColor: colors.primary,
   },
   savedMethodInfoText: {
     fontSize: FontSizes.sm,
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: Spacing.xs,
   },
   cvvNoticeBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.light.backgroundSecondary,
+    backgroundColor: colors.backgroundSecondary,
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     marginBottom: Spacing.md,
     borderLeftWidth: 4,
-    borderLeftColor: Colors.light.warning,
+    borderLeftColor: colors.warning,
   },
   cvvNoticeText: {
     fontSize: FontSizes.sm,
-    color: Colors.light.text,
+    color: colors.text,
     marginLeft: Spacing.sm,
     flex: 1,
     lineHeight: 18,
   },
   cvvRequiredText: {
     fontSize: FontSizes.xs,
-    color: Colors.light.warning,
+    color: colors.warning,
     marginTop: Spacing.xs,
     fontStyle: 'italic',
   },
