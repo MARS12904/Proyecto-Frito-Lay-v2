@@ -13,6 +13,7 @@ import {
   View,
   Dimensions,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
@@ -47,6 +48,7 @@ export default function ProfileScreen() {
   const styles = getStyles(colors);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const { headerPaddingTop } = useResponsive();
+  const [showAboutModal, setShowAboutModal] = useState(false);
 
   // Recargar métricas cuando el usuario cambia o cuando se monta el componente
   useEffect(() => {
@@ -210,6 +212,37 @@ export default function ProfileScreen() {
   };
 
   const handleContact = () => openSupportWhatsApp(user?.name);
+
+  const handleHelp = () => {
+  Alert.alert(
+    'Centro de ayuda',
+    '¿Sobre qué necesitas orientación?',
+    [
+      {
+        text: 'Cómo comprar',
+        onPress: () => Alert.alert(
+          'Cómo comprar',
+          'Ingresa al catálogo, agrega productos al carrito, programa tu entrega y confirma el pago.'
+        ),
+      },
+      {
+        text: 'Pagos y entregas',
+        onPress: () => Alert.alert(
+          'Pagos y entregas',
+          'Puedes pagar con tarjeta, transferencia, crédito comercial o efectivo contra entrega, según disponibilidad.'
+        ),
+      },
+      {
+        text: 'Hablar con soporte',
+        onPress: () => openSupportWhatsApp(user?.name),
+      },
+      {
+        text: 'Cerrar',
+        style: 'cancel',
+      },
+    ]
+  );
+};
 
   const handleNotificationToggle = async (value: boolean) => {
     setNotificationsEnabled(value);
@@ -489,7 +522,7 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Soporte</Text>
         
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={handleHelp}>
           <View style={styles.menuItemLeft}>
             <View style={styles.menuIconContainer}>
               <Ionicons name="help-circle-outline" size={responsive({ xs: 20, sm: 22, md: 24 })} color={Colors.light.success} />
@@ -509,7 +542,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={responsive({ xs: 16, sm: 18, md: 20 })} color={colors.textLight} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => setShowAboutModal(true)}>
           <View style={styles.menuItemLeft}>
             <View style={styles.menuIconContainer}>
               <Ionicons name="information-circle-outline" size={responsive({ xs: 20, sm: 22, md: 24 })} color={colors.success} />
@@ -527,6 +560,37 @@ export default function ProfileScreen() {
           <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={showAboutModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAboutModal(false)}
+      >
+        <View style={styles.aboutOverlay}>
+          <View style={styles.aboutModal}>
+            <View style={styles.aboutHeader}>
+              <Ionicons name="business-outline" size={28} color={colors.primary} />
+              <Text style={styles.aboutTitle}>LayGo Comerciantes</Text>
+            </View>
+
+            <Text style={styles.aboutText}>
+              Somos una plataforma orientada al reabastecimiento de negocios, bodegas y comerciantes que necesitan gestionar pedidos de productos Frito-Lay de forma rápida, ordenada y confiable.
+            </Text>
+
+            <Text style={styles.aboutText}>
+              La app permite revisar catálogo, armar pedidos, programar entregas, gestionar métodos de pago y hacer seguimiento desde un solo lugar.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.aboutButton}
+              onPress={() => setShowAboutModal(false)}
+            >
+              <Text style={styles.aboutButtonText}>Entendido</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Espaciado inferior */}
       <View style={styles.bottomSpacing} />
@@ -884,6 +948,51 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontWeight: '600',
     marginLeft: Spacing.sm,
   },
+
+  //Modal
+  aboutOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.45)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: Spacing.lg,
+    },
+    aboutModal: {
+      width: '100%',
+      backgroundColor: colors.backgroundCard,
+      borderRadius: BorderRadius.lg,
+      padding: Spacing.lg,
+      ...Shadows.lg,
+    },
+    aboutHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: Spacing.md,
+    },
+    aboutTitle: {
+      fontSize: FontSizes.xl,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginLeft: Spacing.sm,
+    },
+    aboutText: {
+      fontSize: FontSizes.md,
+      color: colors.textSecondary,
+      lineHeight: 22,
+      marginBottom: Spacing.md,
+    },
+    aboutButton: {
+      backgroundColor: colors.primary,
+      borderRadius: BorderRadius.lg,
+      paddingVertical: Spacing.md,
+      alignItems: 'center',
+      marginTop: Spacing.sm,
+    },
+    aboutButtonText: {
+      color: colors.background,
+      fontSize: FontSizes.md,
+      fontWeight: '600',
+    },
 
   // Bottom spacing
   bottomSpacing: {

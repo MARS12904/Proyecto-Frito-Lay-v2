@@ -1,8 +1,8 @@
 /** Configuración de soporte y contacto */
 export const SupportConfig = {
-  whatsappNumber: '5197050403',
-  whatsappDisplay: '+51 970 504 03',
-  supportEmail: 'soporte@fritolay.com.pe',
+  whatsappNumber: '51993164045',
+  whatsappDisplay: '+51 993 164 045',
+  supportEmail: 'mars12904@gmail.com',
   companyName: 'Frito-Lay Perú',
 };
 
