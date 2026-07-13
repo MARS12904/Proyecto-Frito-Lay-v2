@@ -23,17 +23,18 @@
 // URLs de imágenes específicas para productos Frito-Lay Perú
 const PRODUCT_IMAGES = {
   // Lay's Perú
-  'lays-clasico-150g': 'https://plazavea.vteximg.com.br/arquivos/ids/31462885-418-418/20355479-3.jpg',
+  'lays-clasico-150g': 'https://metroio.vtexassets.com/arquivos/ids/538568/PAPAS-LAYS-CLASICAS-BOLSA-36G-4-266694.jpg?v=638580441667570000',
   'lays-queso-150g': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRFwNVlWqmdL8thmmehdvLzjQ21VIaj8Q_pQQ&s',
-  'lays-ondas-picante-150g': 'https://plazavea.vteximg.com.br/arquivos/ids/31332540-512-512/20352714-3.jpg',
-  'lays-cebolla-150g': 'https://www.lays.com/sites/lays.com/files//2020-11/sour-cream.jpg',
-  'lays-barbacoa-edicion-limitada-150g': 'https://www.lays.com/sites/lays.com/files//2021-07/XL%20Lay%27s%20Sweet%20Southern%20Heat%20BBQ.png',
+  'lays-ondas-picante-150g': 'https://metroio.vtexassets.com/arquivos/ids/542892-800-auto?v=638611545675030000&width=800&height=auto&aspect=true',
+  'lays-cebolla-150g': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTGmjnYBYL4SGthtLIniAAcyg9H8bP-P2j-_8HGzHOLgXslxI1HIBHhONs&s=10',
+  'lays-barbacoa-edicion-limitada-150g': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRxrDseo9r2MdQOKPm_pVc5h4AFtmK3SbyA31Y8zzTB3O1pePsxJ3SkpOuO&s=10',
 
   // Doritos Perú
   'doritos-nacho-cheese-145g': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRVWFFEn71TrjFkWUGB0d4p0zPdJ5Dx7yp3og&s',
   'doritos-cool-ranch-145g': 'https://www.tastyrewards.com/sites/default/files/2024-02/Doritos_CoolRanch.jpg',
   'doritos-flamin-hot-145g': 'https://www.dia.es/content-manager/image/Carpeta_IMG_landings_proveedores/landingpepsi_DORITOS_20240401.png',
   'doritos-fuego-145g': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQb5xVkjzzGb059KOEowuMRnVAeaHwk0EiAGA&s',
+  'doritos-dinamita-145g': 'https://metroio.vtexassets.com/arquivos/ids/537706/Doritos-Dinamita-Flamin-Hot-35g-4-246943.jpg?v=638576121910930000',
 
   // Cheetos Perú
   'cheetos-queso-clasico-150g': 'https://m.media-amazon.com/images/S/al-eu-726f4d26-7fdb/8e62b18c-e077-487c-be0a-6b135896315d._CR117%2C0%2C750%2C750_SX750_SY750_.png',
@@ -43,11 +44,11 @@ const PRODUCT_IMAGES = {
 
   // Cheese Tris / Chizitos
   'cheese-tris-queso-150g': 'https://static.wixstatic.com/media/921600_ef1ccea6c11a44348d9dc3f0ae3d76f3~mv2.webp/v1/fill/w_480,h_480,al_c,lg_1,q_80,enc_avif,quality_auto/921600_ef1ccea6c11a44348d9dc3f0ae3d76f3~mv2.webp',
-  'chizitos-queso-natural-150g': 'https://wongfood.vtexassets.com/arquivos/ids/504160-800-auto?v=637744308771800000&width=800&height=auto&aspect=true',
+  'chizitos-queso-natural-150g': 'https://vegaperu.vtexassets.com/arquivos/ids/157503/7758574001857.jpg?v=637618919546330000',
 
   // Piqueo Snax
-  'piqueo-snax-mix-clasico-145g': 'https://plazavea.vteximg.com.br/arquivos/ids/29321987-418-418/20236181.jpg',
-  'piqueo-snax-picante-mixto-145g': 'https://metroio.vtexassets.com/arquivos/ids/610947/Piqueo-Snax-Sabor-Queso-Picante-190g-1-353126.jpg?v=638962329753600000',
+  'piqueo-snax-mix-clasico-145g': 'https://plazavea.vteximg.com.br/arquivos/ids/34750398-1000-1000/20179461.jpg?v=639154116733830000',
+  'piqueo-snax-picante-mixto-145g': 'https://metroio.vtexassets.com/arquivos/ids/649242/Piqueo-Snax-Queso-Picante-190g-1-353126.jpg?v=639162778791400000',
 
   // Cuates
   'cuates-natural-150g': 'https://sumerlabs.com/default/image-tool-lambda?new-width=700&new-height=700&new-quality=80&url-image=https%3A%2F%2Fsumerlabs.com%2Fsumer-app-90b8f.appspot.com%2Fproduct_photos%252F9db380ea5b886789745a6a04080c0408%252Fscaled_image_picker4497447116931694703.jpg%3Falt%3Dmedia%26token%3D1b83c3d5-5273-469a-8d5a-7152f371dd6c',
