@@ -18,6 +18,7 @@ interface DeliverySchedule {
   timeSlot: string;
   address: string;
   addressId?: string; // ID de la dirección en delivery_addresses
+  zone?: string; // Zona de entrega para calcular el cargo de envío
   notes?: string;
 }
 
@@ -53,6 +54,23 @@ interface CartContextType {
     errors: string[];
   };
 }
+
+const deliveryAreaFees: Record<string, number> = {
+  'lima-centro': 0,
+  'lima-norte': 5,
+  'lima-sur': 5,
+  'lima-este': 8,
+  'callao': 3,
+  'provincias': 15,
+};
+
+const getDeliveryFee = (schedule?: DeliverySchedule): number => {
+  if (!schedule?.zone) {
+    return 0;
+  }
+
+  return deliveryAreaFees[schedule.zone] ?? 0;
+};
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
@@ -302,7 +320,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const getCartSummary = () => {
-    const deliveryFee = deliverySchedule ? 15.00 : 0; // Tarifa de envío programado
+    const deliveryFee = getDeliveryFee(deliverySchedule);
     const wholesaleSavings = regularTotal - wholesaleTotal;
     const finalTotal = totalPrice + deliveryFee;
 

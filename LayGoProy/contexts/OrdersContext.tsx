@@ -28,6 +28,8 @@ export interface Order {
   items: OrderItem[];
   trackingNumber?: string; // legacy, ya no se genera en BD
   deliveryDate?: string;
+  deliveryFee?: number;
+  deliveryZone?: string;
   deliveryAddress?: string;
   deliveryAddressId?: string; // ID de la dirección en delivery_addresses
   deliveryTimeSlot?: string;

@@ -55,6 +55,7 @@ interface DeliverySchedule {
   timeSlot: string;
   address: string;
   addressId?: string; // ID de la dirección en delivery_addresses
+  zone?: string; // Zona de entrega para calcular el cargo de envío
   notes?: string;
 }
 
@@ -590,12 +591,16 @@ export default function DeliveryScheduler({
     }
 
     const proceedWithSchedule = (addressId?: string) => {
+      const selectedAddressData = savedAddresses.find(addr => addr.id === selectedAddressId);
+      const currentZone = selectedAddressData?.zone || selectedArea || undefined;
+
       const schedule: DeliverySchedule = {
         id: existingSchedule?.id || Date.now().toString(),
         date: selectedDate,
         timeSlot: selectedTimeData.label,
         address: address.trim(),
         addressId: addressId,
+        zone: currentZone,
         notes: notes.trim() || undefined,
       };
 

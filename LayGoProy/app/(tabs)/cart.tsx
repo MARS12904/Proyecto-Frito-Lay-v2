@@ -46,11 +46,12 @@ export default function CartScreen() {
 function CartContent() {
   const colors = useAppColors();
   const styles = getStyles(colors);
-  const { items, totalItems, totalPrice, updateQuantity, removeFromCart, clearCart, deliverySchedule, setDeliverySchedule } = useCart();
+  const { items, totalItems, totalPrice, updateQuantity, removeFromCart, clearCart, deliverySchedule, setDeliverySchedule, getCartSummary } = useCart();
   const [showDeliveryScheduler, setShowDeliveryScheduler] = useState(false);
   const insets = useSafeAreaInsets();
   const { horizontalPadding, scaleFont } = useResponsive();
-  const shippingFee = deliverySchedule ? 15 : 0;
+  const cartSummary = getCartSummary();
+  const shippingFee = cartSummary.deliveryFee;
 
   const handleQuantityChange = (productId: string, quantity: number) => {
     if (quantity <= 0) {

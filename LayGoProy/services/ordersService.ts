@@ -26,6 +26,8 @@ const mapOrder = (order: any): Order => ({
   savings: Number(order.savings ?? 0),
   items: (order.order_items || []).map(mapOrderItem),
   deliveryDate: order.delivery_date,
+  deliveryFee: Number(order.delivery_fee ?? 0),
+  deliveryZone: order.delivery_zone || undefined,
   deliveryAddress: order.delivery_addresses?.address || '',
   deliveryAddressId: order.delivery_address_id || undefined,
   deliveryTimeSlot: order.delivery_time_slot,
@@ -106,26 +108,27 @@ export const ordersService = {
     }
 
     try {
-      const totalAmount = orderData.items.reduce((sum, item) => sum + item.subtotal, 0);
-
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          user_id: orderData.userId,
-          total: totalAmount,
-          wholesale_total: orderData.wholesaleTotal || totalAmount,
-          savings: orderData.savings || 0,
-          status: 'pending',
-          payment_status: 'pending',
-          delivery_address_id: orderData.deliveryAddressId || null,
-          delivery_date: orderData.deliveryDate,
-          delivery_time_slot: orderData.deliveryTimeSlot,
-          payment_method: orderData.paymentMethod,
-          notes: orderData.notes || null,
-          is_wholesale: orderData.isWholesale,
-        })
-        .select('id')
-        .single();
+        // Use the total passed by the caller (includes delivery fee, processing, etc.)
+        const { data: order, error: orderError } = await supabase
+          .from('orders')
+          .insert({
+            user_id: orderData.userId,
+            total: orderData.total,
+            wholesale_total: orderData.wholesaleTotal || orderData.total,
+            savings: orderData.savings || 0,
+            status: 'pending',
+            payment_status: 'pending',
+            delivery_address_id: orderData.deliveryAddressId || null,
+            delivery_date: orderData.deliveryDate,
+            delivery_time_slot: orderData.deliveryTimeSlot,
+            payment_method: orderData.paymentMethod,
+            notes: orderData.notes || null,
+            is_wholesale: orderData.isWholesale,
+            delivery_fee: orderData.deliveryFee ?? 0,
+            delivery_zone: orderData.deliveryZone || null,
+          })
+          .select('id')
+          .single();
 
       if (orderError || !order) {
         console.error('Error creating order:', orderError);

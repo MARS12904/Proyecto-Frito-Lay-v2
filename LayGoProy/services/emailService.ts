@@ -163,7 +163,7 @@ export function generateOrderConfirmationEmail(order: Order, userName: string): 
                 </p>
                 ${order.deliveryDate ? `
                 <p style="color: #333; margin: 5px 0; font-size: 14px;">
-                  <strong>Fecha de Entrega:</strong> ${formatDate(order.deliveryDate)}
+                  <strong>Fecha de Envío:</strong> ${formatDate(order.deliveryDate)}
                 </p>
                 ` : ''}
                 ${order.deliveryTimeSlot ? `
@@ -179,15 +179,15 @@ export function generateOrderConfirmationEmail(order: Order, userName: string): 
                 ${order.isWholesale && order.savings > 0 ? `
                 <tr>
                   <td style="padding: 8px 0; text-align: right; color: #666;">
-                    Subtotal:
+                    Precio Original:
                   </td>
-                  <td style="padding: 8px 0; text-align: right; padding-left: 20px; width: 120px; color: #333;">
+                  <td style="padding: 8px 0; text-align: right; padding-left: 20px; width: 120px; color: #333; text-decoration: line-through;">
                     S/ ${(order.total + order.savings).toFixed(2)}
                   </td>
                 </tr>
                 <tr>
                   <td style="padding: 8px 0; text-align: right; color: #666;">
-                    Descuento Mayorista:
+                    Ahorro Mayorista:
                   </td>
                   <td style="padding: 8px 0; text-align: right; padding-left: 20px; color: #28a745; font-weight: bold;">
                     -S/ ${order.savings.toFixed(2)}
@@ -251,7 +251,7 @@ export function generateOrderConfirmationEmailText(order: Order, userName: strin
   let text = `¡Pedido Confirmado!\n\n`;
   text += `Hola ${userName},\n\n`;
   text += `Gracias por tu compra. Tu pedido ha sido recibido y está siendo procesado.\n\n`;
-  text += `Número de Pedido: ${order.id}\n`;
+  text += `Fecha de envío: ${order.deliveryDate ? formatDate(order.deliveryDate) : 'No especificada'}\n`;
   text += `Fecha: ${orderDate}\n`;
   text += `Estado: ${getStatusLabel(order.status)}\n`;
   text += `Método de Pago: ${order.paymentMethod}\n\n`;
@@ -265,8 +265,8 @@ export function generateOrderConfirmationEmailText(order: Order, userName: strin
   
   text += `\n${'='.repeat(50)}\n`;
   if (order.isWholesale && order.savings > 0) {
-    text += `Subtotal: S/ ${(order.total + order.savings).toFixed(2)}\n`;
-    text += `Descuento Mayorista: -S/ ${order.savings.toFixed(2)}\n`;
+    text += `Precio Original: S/ ${(order.total + order.savings).toFixed(2)}\n`;
+    text += `Ahorro Mayorista: -S/ ${order.savings.toFixed(2)}\n`;
   }
   text += `TOTAL: S/ ${order.total.toFixed(2)}\n\n`;
   
@@ -312,15 +312,12 @@ function generateItemsHtml(items: Order['items']): string {
 }
 
 // Configuración de EmailJS desde variables de entorno
-const emailJsServiceId =
-  process.env.EXPO_PUBLIC_EMAILJS_SERVICE_ID || 'service_xg32syj';
-const emailJsTemplateId =
-  process.env.EXPO_PUBLIC_EMAILJS_TEMPLATE_ID || 'template_dhx72hh';
-const emailJsPublicKey =
-  process.env.EXPO_PUBLIC_EMAILJS_PUBLIC_KEY || 'U6JTnDcliUFxpKRSG';
-const emailJsPrivateKey =
-  process.env.EXPO_PUBLIC_EMAILJS_PRIVATE_KEY || 'aajVA4khB07FJT0C1-xe0';
-
+const emailJsServiceId = process.env.EXPO_PUBLIC_EMAILJS_SERVICE_ID;
+const emailJsTemplateId = process.env.EXPO_PUBLIC_EMAILJS_TEMPLATE_ID;
+const emailJsPublicKey = process.env.EXPO_PUBLIC_EMAILJS_PUBLIC_KEY;
+const emailJsPrivateKey = process.env.EXPO_PUBLIC_EMAILJS_PRIVATE_KEY;
+const emailJsSenderName = process.env.EXPO_PUBLIC_EMAILJS_FROM_NAME || 'Frito-Lay Perú';
+const emailJsReplyTo = process.env.EXPO_PUBLIC_EMAILJS_REPLY_TO || '';
 /**
  * Envía un correo electrónico usando EmailJS
  */
@@ -388,15 +385,21 @@ export async function sendOrderConfirmationEmail(
     order_status: getStatusLabel(order.status),
     payment_method: order.paymentMethod,
     delivery_address: order.deliveryAddress || '',
+    delivery_date: order.deliveryDate ? formatDate(order.deliveryDate) : '',
     delivery_slot: order.deliveryTimeSlot || '',
+    delivery_zone: order.deliveryZone || '',
+    delivery_fee: order.deliveryFee?.toFixed(2) || '0.00',
     is_wholesale: order.isWholesale ? 'true' : '',
     subtotal: order.wholesaleTotal.toFixed(2),
     savings: order.savings.toFixed(2),
     total: order.total.toFixed(2),
+    original_price: (order.total + order.savings).toFixed(2),
     tracking_number: order.trackingNumber || '',
     current_year: new Date().getFullYear().toString(),
     items_html: generateItemsHtml(order.items),
     to_email: userEmail,
+    from_name: emailJsSenderName,
+    ...(emailJsReplyTo ? { reply_to: emailJsReplyTo } : {}),
   };
   
   return await sendEmail({

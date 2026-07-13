@@ -63,6 +63,8 @@ interface Order {
   paymentMethod: string;
   isWholesale: boolean;
   notes?: string;
+  deliveryFee?: number;
+  deliveryZone?: string;
 }
 
 const mockOrders: Order[] = [
@@ -263,6 +265,9 @@ function OrdersContent() {
         <View style={styles.orderFooter}>
           <View style={styles.totalInfo}>
             <Text style={styles.orderTotal}>S/ {item.total.toFixed(2)}</Text>
+            {typeof item.deliveryFee === 'number' && item.deliveryFee > 0 && (
+              <Text style={styles.savingsText}>Envío: S/ {item.deliveryFee.toFixed(2)}</Text>
+            )}
             {item.isWholesale && item.savings > 0 && (
               <Text style={styles.savingsText}>Ahorro: S/ {item.savings.toFixed(2)}</Text>
             )}
@@ -453,16 +458,31 @@ function OrdersContent() {
 
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryTitle}>Resumen</Text>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Subtotal:</Text>
-                  <Text style={styles.summaryValue}>S/ {selectedOrder.wholesaleTotal.toFixed(2)}</Text>
-                </View>
-                {selectedOrder.isWholesale && selectedOrder.savings > 0 && (
+                {selectedOrder.isWholesale && selectedOrder.savings > 0 ? (
+                  <>
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Precio Original:</Text>
+                      <Text style={[styles.summaryValue, styles.originalPriceValue]}>S/ {(selectedOrder.total + selectedOrder.savings).toFixed(2)}</Text>
+                    </View>
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Subtotal:</Text>
+                      <Text style={styles.summaryValue}>S/ {selectedOrder.wholesaleTotal.toFixed(2)}</Text>
+                    </View>
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Ahorro mayorista:</Text>
+                      <Text style={[styles.summaryValue, styles.savingsValue]}>-S/ {selectedOrder.savings.toFixed(2)}</Text>
+                    </View>
+                    {typeof selectedOrder.deliveryFee === 'number' && selectedOrder.deliveryFee > 0 && (
+                      <View style={styles.summaryRow}>
+                        <Text style={styles.summaryLabel}>Envío:</Text>
+                        <Text style={styles.summaryValue}>S/ {selectedOrder.deliveryFee.toFixed(2)}</Text>
+                      </View>
+                    )}
+                  </>
+                ) : (
                   <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Ahorro mayorista:</Text>
-                    <Text style={[styles.summaryValue, styles.savingsValue]}>
-                      -S/ {selectedOrder.savings.toFixed(2)}
-                    </Text>
+                    <Text style={styles.summaryLabel}>Subtotal:</Text>
+                    <Text style={styles.summaryValue}>S/ {selectedOrder.wholesaleTotal.toFixed(2)}</Text>
                   </View>
                 )}
                 <View style={[styles.summaryRow, styles.totalRow]}>
@@ -868,6 +888,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: FontSizes.sm,
     color: colors.text,
     fontWeight: '500',
+  },
+  originalPriceValue: {
+    textDecorationLine: 'line-through',
+    color: colors.textSecondary,
   },
   savingsValue: {
     color: colors.success,

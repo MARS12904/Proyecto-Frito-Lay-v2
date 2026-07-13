@@ -277,6 +277,8 @@ function PaymentsContent() {
         deliveryDate: deliverySchedule?.date,
         deliveryAddress: deliverySchedule?.address,
         deliveryAddressId: deliverySchedule?.addressId, // ID de la dirección para relación directa
+        deliveryFee: cartSummary.deliveryFee,
+        deliveryZone: deliverySchedule?.zone,
         deliveryTimeSlot: deliverySchedule?.timeSlot,
         paymentMethod: paymentMethodName,
         isWholesale: isWholesaleMode,
@@ -302,6 +304,8 @@ function PaymentsContent() {
         deliveryDate: deliverySchedule?.date,
         deliveryAddress: deliverySchedule?.address,
         deliveryTimeSlot: deliverySchedule?.timeSlot,
+        deliveryFee: cartSummary.deliveryFee,
+        deliveryZone: deliverySchedule?.zone,
         paymentMethod: paymentMethodName,
         isWholesale: isWholesaleMode,
         userId: user.id,
@@ -531,12 +535,20 @@ function PaymentsContent() {
         </View>
         
         {isWholesaleMode && cartSummary.wholesaleSavings > 0 && (
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Ahorro mayorista:</Text>
-            <Text style={[styles.summaryValue, styles.savingsValue]}>
-              -S/ {cartSummary.wholesaleSavings.toFixed(2)}
-            </Text>
-          </View>
+          <>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Precio original:</Text>
+              <Text style={[styles.summaryValue, styles.originalPriceValue]}>
+                S/ {(cartSummary.totalPrice + cartSummary.wholesaleSavings).toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Ahorro mayorista:</Text>
+              <Text style={[styles.summaryValue, styles.savingsValue]}>
+                -S/ {cartSummary.wholesaleSavings.toFixed(2)}
+              </Text>
+            </View>
+          </>
         )}
         
         {cartSummary.deliveryFee > 0 && (
@@ -946,6 +958,10 @@ const getStyles = (colors: any) => StyleSheet.create({
     fontSize: FontSizes.sm,
     color: colors.text,
     fontWeight: '500',
+  },
+  originalPriceValue: {
+    textDecorationLine: 'line-through',
+    color: colors.textSecondary,
   },
   savingsValue: {
     color: colors.success,

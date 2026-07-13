@@ -19,6 +19,8 @@ export interface DeliverySchedule {
   date: string;
   timeSlot: string;
   address: string;
+  addressId?: string;
+  zone?: string;
   notes?: string;
 }
 
