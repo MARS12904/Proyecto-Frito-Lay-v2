@@ -182,9 +182,19 @@ export function generateOrderConfirmationEmail(order: Order, userName: string): 
                     Precio Original:
                   </td>
                   <td style="padding: 8px 0; text-align: right; padding-left: 20px; width: 120px; color: #333; text-decoration: line-through;">
-                    S/ ${(order.total + order.savings).toFixed(2)}
+                    S/ ${(order.wholesaleTotal + order.savings).toFixed(2)}
                   </td>
                 </tr>
+                ` : ''}
+                <tr>
+                  <td style="padding: 8px 0; text-align: right; color: #666;">
+                    Subtotal:
+                  </td>
+                  <td style="padding: 8px 0; text-align: right; padding-left: 20px; color: #333;">
+                    S/ ${order.wholesaleTotal.toFixed(2)}
+                  </td>
+                </tr>
+                ${order.isWholesale && order.savings > 0 ? `
                 <tr>
                   <td style="padding: 8px 0; text-align: right; color: #666;">
                     Ahorro Mayorista:
@@ -194,6 +204,29 @@ export function generateOrderConfirmationEmail(order: Order, userName: string): 
                   </td>
                 </tr>
                 ` : ''}
+                ${order.deliveryFee && order.deliveryFee > 0 ? `
+                <tr>
+                  <td style="padding: 8px 0; text-align: right; color: #666;">
+                    Envío:
+                  </td>
+                  <td style="padding: 8px 0; text-align: right; padding-left: 20px; color: #333;">
+                    S/ ${order.deliveryFee.toFixed(2)}
+                  </td>
+                </tr>
+                ` : ''}
+                ${(() => {
+                  const commission = Math.round((order.total - order.wholesaleTotal - (order.deliveryFee ?? 0)) * 100) / 100;
+                  return commission > 0 ? `
+                  <tr>
+                    <td style="padding: 8px 0; text-align: right; color: #666;">
+                      Comisión:
+                    </td>
+                    <td style="padding: 8px 0; text-align: right; padding-left: 20px; color: #333;">
+                      S/ ${commission.toFixed(2)}
+                    </td>
+                  </tr>
+                  ` : '';
+                })()}
                 <tr style="border-top: 2px solid #E31E24;">
                   <td style="padding: 15px 0; text-align: right; font-size: 18px; font-weight: bold; color: #333;">
                     Total:
@@ -265,9 +298,22 @@ export function generateOrderConfirmationEmailText(order: Order, userName: strin
   
   text += `\n${'='.repeat(50)}\n`;
   if (order.isWholesale && order.savings > 0) {
-    text += `Precio Original: S/ ${(order.total + order.savings).toFixed(2)}\n`;
+    text += `Precio Original: S/ ${(order.wholesaleTotal + order.savings).toFixed(2)}\n`;
+    text += `Subtotal: S/ ${order.wholesaleTotal.toFixed(2)}\n`;
     text += `Ahorro Mayorista: -S/ ${order.savings.toFixed(2)}\n`;
+  } else {
+    text += `Subtotal: S/ ${order.wholesaleTotal.toFixed(2)}\n`;
   }
+  
+  if (order.deliveryFee && order.deliveryFee > 0) {
+    text += `Envío: S/ ${order.deliveryFee.toFixed(2)}\n`;
+  }
+  
+  const commission = Math.round((order.total - order.wholesaleTotal - (order.deliveryFee ?? 0)) * 100) / 100;
+  if (commission > 0) {
+    text += `Comisión: S/ ${commission.toFixed(2)}\n`;
+  }
+  
   text += `TOTAL: S/ ${order.total.toFixed(2)}\n\n`;
   
   if (order.deliveryAddress) {
@@ -393,7 +439,11 @@ export async function sendOrderConfirmationEmail(
     subtotal: order.wholesaleTotal.toFixed(2),
     savings: order.savings.toFixed(2),
     total: order.total.toFixed(2),
-    original_price: (order.total + order.savings).toFixed(2),
+    original_price: (order.wholesaleTotal + order.savings).toFixed(2),
+    commission: (() => {
+      const commission = Math.round((order.total - order.wholesaleTotal - (order.deliveryFee ?? 0)) * 100) / 100;
+      return commission > 0 ? commission.toFixed(2) : '0.00';
+    })(),
     tracking_number: order.trackingNumber || '',
     current_year: new Date().getFullYear().toString(),
     items_html: generateItemsHtml(order.items),

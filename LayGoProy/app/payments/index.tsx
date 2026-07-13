@@ -235,14 +235,19 @@ function PaymentsContent() {
     }
 
     try {
-      // Determinar el nombre del método de pago
+      // Determinar el nombre del método de pago y la comisión
       let paymentMethodName = 'Desconocido';
+      let processingFee = 0;
       if (selectedSavedMethod && !useDifferentMethod) {
         const savedMethod = savedPaymentMethods.find(m => m.id === selectedSavedMethod);
         paymentMethodName = savedMethod?.name || 'Método guardado';
+        const methodType = savedMethod?.type;
+        const currentMethod = paymentMethods.find(m => m.id === methodType);
+        processingFee = currentMethod?.processingFee || 0;
       } else {
         const currentMethod = paymentMethods.find(m => m.id === selectedMethod);
         paymentMethodName = currentMethod?.name || 'Desconocido';
+        processingFee = currentMethod?.processingFee || 0;
       }
 
       // 1. Verificar y reducir stock disponible (ahora sí se reduce al procesar el pago)
@@ -269,8 +274,11 @@ function PaymentsContent() {
       }));
 
       const cartSummary = getCartSummary();
+      const commission = Math.round(cartSummary.finalTotal * processingFee * 100) / 100;
+      const finalTotalWithFee = cartSummary.finalTotal + commission;
+
       const orderId = await addOrder({
-        total: cartSummary.finalTotal,
+        total: finalTotalWithFee,
         wholesaleTotal: cartSummary.totalPrice,
         savings: cartSummary.wholesaleSavings,
         items: orderItems,
@@ -287,7 +295,7 @@ function PaymentsContent() {
 
       // 3. Actualizar métricas del usuario
       await updateMetrics(user.id, {
-        total: cartSummary.finalTotal,
+        total: finalTotalWithFee,
         savings: cartSummary.wholesaleSavings,
         items: orderItems,
       });
@@ -297,7 +305,7 @@ function PaymentsContent() {
         id: orderId,
         date: new Date().toISOString().split('T')[0],
         status: 'pending' as const,
-        total: cartSummary.finalTotal,
+        total: finalTotalWithFee,
         wholesaleTotal: cartSummary.totalPrice,
         savings: cartSummary.wholesaleSavings,
         items: orderItems,
@@ -331,7 +339,7 @@ function PaymentsContent() {
       // 6. Mostrar confirmación
       Alert.alert(
         '¡Pago Exitoso!',
-        `Tu pedido ${orderId} ha sido procesado exitosamente.\n\nTotal: S/ ${cartSummary.finalTotal.toFixed(2)}\n\nHemos enviado un correo de confirmación a ${user.email}.`,
+        `Tu pedido ${orderId} ha sido procesado exitosamente.\n\nTotal: S/ ${finalTotalWithFee.toFixed(2)}\n\nHemos enviado un correo de confirmación a ${user.email}.`,
         [
           {
             text: 'Ver Pedidos',
@@ -415,7 +423,8 @@ function PaymentsContent() {
     }
 
     const processingFee = finalPaymentMethod.processingFee || 0;
-    const finalTotal = cartSummary.finalTotal + (cartSummary.finalTotal * processingFee);
+    const commission = Math.round(cartSummary.finalTotal * processingFee * 100) / 100;
+    const finalTotal = cartSummary.finalTotal + commission;
 
     const paymentMethodName = selectedSavedMethod && !useDifferentMethod
       ? savedPaymentMethods.find(m => m.id === selectedSavedMethod)?.name || finalPaymentMethod.name
@@ -424,7 +433,7 @@ function PaymentsContent() {
     Alert.alert(
       'Confirmar Pago',
       `¿Proceder con el pago de S/ ${finalTotal.toFixed(2)} usando ${paymentMethodName}?${
-        processingFee > 0 ? `\n\nComisión: S/ ${(cartSummary.finalTotal * processingFee).toFixed(2)}` : ''
+        processingFee > 0 ? `\n\nComisión: S/ ${commission.toFixed(2)}` : ''
       }`,
       [
         { text: 'Cancelar', style: 'cancel' },
@@ -563,12 +572,13 @@ function PaymentsContent() {
             ? paymentMethods.find(m => m.id === savedPaymentMethods.find(sm => sm.id === selectedSavedMethod)?.type)
             : paymentMethods.find(m => m.id === selectedMethod);
           const fee = currentMethod?.processingFee || 0;
+          const commission = Math.round(cartSummary.finalTotal * fee * 100) / 100;
           
           return fee > 0 ? (
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Comisión de procesamiento:</Text>
               <Text style={styles.summaryValue}>
-                S/ {(cartSummary.finalTotal * fee).toFixed(2)}
+                S/ {commission.toFixed(2)}
               </Text>
             </View>
           ) : null;
@@ -582,7 +592,8 @@ function PaymentsContent() {
                 ? paymentMethods.find(m => m.id === savedPaymentMethods.find(sm => sm.id === selectedSavedMethod)?.type)
                 : paymentMethods.find(m => m.id === selectedMethod);
               const fee = currentMethod?.processingFee || 0;
-              return (cartSummary.finalTotal + (cartSummary.finalTotal * fee)).toFixed(2);
+              const commission = Math.round(cartSummary.finalTotal * fee * 100) / 100;
+              return (cartSummary.finalTotal + commission).toFixed(2);
             })()}
           </Text>
         </View>
