@@ -1,0 +1,15 @@
+MANUAL DE USAURIO
+
+Instalar las dependencias y actualizar dependencias de expo.
+
+- npm install
+
+Luego ejecutar.
+
+- npm install expo@~54.0.35 expo-file-system@~19.0.23 expo-font@~14.0.12 expo-router@~6.0.24
+
+Por si las dependencias de expo aparecen desactualizadas al momento de hacer el deploy al proyecto.
+
+Finalmente, npm start
+
+Para poder visualizar el proyecto se recomienda instalar la aplicación Expo Go en Play Store o AppStore
