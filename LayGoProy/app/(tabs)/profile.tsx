@@ -14,6 +14,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Modal,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
@@ -214,35 +215,35 @@ export default function ProfileScreen() {
   const handleContact = () => openSupportWhatsApp(user?.name);
 
   const handleHelp = () => {
-  Alert.alert(
-    'Centro de ayuda',
-    '¿Sobre qué necesitas orientación?',
-    [
-      {
-        text: 'Cómo comprar',
-        onPress: () => Alert.alert(
-          'Cómo comprar',
-          'Ingresa al catálogo, agrega productos al carrito, programa tu entrega y confirma el pago.'
-        ),
-      },
-      {
-        text: 'Pagos y entregas',
-        onPress: () => Alert.alert(
-          'Pagos y entregas',
-          'Puedes pagar con tarjeta, transferencia, crédito comercial o efectivo contra entrega, según disponibilidad.'
-        ),
-      },
-      {
-        text: 'Hablar con soporte',
-        onPress: () => openSupportWhatsApp(user?.name),
-      },
-      {
-        text: 'Cerrar',
-        style: 'cancel',
-      },
-    ]
-  );
-};
+    Alert.alert(
+      'Centro de ayuda',
+      '¿Sobre qué necesitas orientación?',
+      [
+        {
+          text: 'Cómo comprar',
+          onPress: () => Alert.alert(
+            'Cómo comprar',
+            'Ingresa al catálogo, agrega productos al carrito, programa tu entrega y confirma el pago.'
+          ),
+        },
+        {
+          text: 'Pagos y entregas',
+          onPress: () => Alert.alert(
+            'Pagos y entregas',
+            'Puedes pagar con tarjeta, transferencia, crédito comercial o efectivo contra entrega, según disponibilidad.'
+          ),
+        },
+        {
+          text: 'Hablar con soporte',
+          onPress: () => openSupportWhatsApp(user?.name),
+        },
+        {
+          text: 'Cerrar',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
 
   const handleNotificationToggle = async (value: boolean) => {
     setNotificationsEnabled(value);

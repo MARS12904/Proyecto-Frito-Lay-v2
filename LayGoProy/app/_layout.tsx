@@ -10,6 +10,7 @@ import { CartProvider } from '../contexts/CartContext';
 import { OrdersProvider } from '../contexts/OrdersContext';
 import { StockProvider } from '../contexts/StockContext';
 import { MetricsProvider } from '../contexts/MetricsContext';
+import { WebAlertProvider } from '../components/ui/WebAlertProvider';
 
 export const unstable_settings = { anchor: '(tabs)' };
 
@@ -42,6 +43,7 @@ export default function RootLayout() {
               <OrdersProvider>
                 <CartProvider>
                   <RootNavigator />
+                  <WebAlertProvider />
                 </CartProvider>
               </OrdersProvider>
             </MetricsProvider>
