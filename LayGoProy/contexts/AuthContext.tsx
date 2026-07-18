@@ -901,9 +901,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const forgotPassword = async (email: string): Promise<boolean> => {
     try {
-      // Simulación de recuperación de contraseña
-      console.log('Enviando email de recuperación a:', email);
-      return true;
+      const normalizedEmail = email.toLowerCase().trim();
+      const { supabase, isSupabaseAvailable } = await import('../lib/supabase');
+      
+      if (isSupabaseAvailable() && supabase) {
+        try {
+          const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+            redirectTo: Platform.OS === 'web' && typeof window !== 'undefined'
+              ? `${window.location.origin}/auth/login`
+              : undefined,
+          });
+          
+          if (error) {
+            console.error('Supabase forgot password error:', error);
+            Alert.alert('Error', error.message || 'No se pudo enviar el correo de recuperación.');
+            return false;
+          }
+          return true;
+        } catch (supabaseError) {
+          console.error('Error in Supabase forgotPassword:', supabaseError);
+        }
+      }
+
+      // Fallback local: verificar si el correo está registrado en el almacenamiento local
+      const isRegistered = await UserStorage.isEmailRegistered(normalizedEmail);
+      if (isRegistered) {
+        console.log('Simulación de recuperación local enviada a:', normalizedEmail);
+        return true;
+      } else {
+        Alert.alert('Error', 'El correo ingresado no está registrado.');
+        return false;
+      }
     } catch (error) {
       console.error('Forgot password error:', error);
       return false;
@@ -912,9 +940,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const changePassword = async (currentPassword: string, newPassword: string): Promise<boolean> => {
     try {
-      // Simulación de cambio de contraseña
-      console.log('Cambiando contraseña...');
-      return true;
+      if (!user) {
+        Alert.alert('Error', 'No hay sesión de usuario activa.');
+        return false;
+      }
+
+      const { supabase, isSupabaseAvailable } = await import('../lib/supabase');
+      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id);
+
+      if (isSupabaseAvailable() && supabase && isValidUUID) {
+        try {
+          // Para cambiar contraseña en Supabase de forma segura, primero intentamos iniciar sesión
+          // con la contraseña actual para verificar que es correcta.
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: user.email.toLowerCase().trim(),
+            password: currentPassword,
+          });
+
+          if (signInError) {
+            console.error('Error al verificar la contraseña actual con Supabase:', signInError);
+            Alert.alert('Error', 'La contraseña actual es incorrecta.');
+            return false;
+          }
+
+          // Actualizar contraseña en Supabase
+          const { error: updateError } = await supabase.auth.updateUser({
+            password: newPassword,
+          });
+
+          if (updateError) {
+            console.error('Error al cambiar la contraseña en Supabase:', updateError);
+            Alert.alert('Error', updateError.message || 'No se pudo actualizar la contraseña.');
+            return false;
+          }
+
+          return true;
+        } catch (supabaseError) {
+          console.error('Error in Supabase changePassword:', supabaseError);
+          Alert.alert('Error', 'Error de conexión al cambiar la contraseña.');
+          return false;
+        }
+      }
+
+      // Fallback local
+      const storedUser = await UserStorage.getUserById(user.id);
+      if (!storedUser || storedUser.password !== currentPassword) {
+        Alert.alert('Error', 'La contraseña actual es incorrecta.');
+        return false;
+      }
+
+      const updatedUser = await UserStorage.updateUser(user.id, { password: newPassword });
+      if (updatedUser) {
+        await UserStorage.setCurrentUser(updatedUser);
+        // Actualizar credenciales biométricas si estaban guardadas
+        await saveBiometricCredentials(user.email, newPassword);
+        return true;
+      }
+
+      return false;
     } catch (error) {
       console.error('Change password error:', error);
       return false;

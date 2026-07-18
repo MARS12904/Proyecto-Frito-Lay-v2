@@ -80,7 +80,7 @@ export const products: Product[] = [
     description: 'Papas fritas con sabor a queso.',
     weight: '150g',
     unit: 'bolsa',
-    stock: 400,
+    stock: 500,
     minOrderQuantity: 12,
     maxOrderQuantity: 120,
     isAvailable: true,
@@ -483,7 +483,7 @@ export const getWholesaleProducts = (): Product[] => {
 
 export const searchProducts = (query: string): Product[] => {
   const lowercaseQuery = query.toLowerCase();
-  return products.filter(product => 
+  return products.filter(product =>
     product.name.toLowerCase().includes(lowercaseQuery) ||
     product.brand.toLowerCase().includes(lowercaseQuery) ||
     product.tags.some(tag => tag.toLowerCase().includes(lowercaseQuery))
